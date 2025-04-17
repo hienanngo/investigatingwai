@@ -107,11 +107,6 @@ with tabs[0]:
 with tabs[1]:
     st.subheader("🧠 PCA + UMAP + Clustering (Excludes Racial Disparities)")
 
-    feature_groups = st.sidebar.multiselect(
-        "Include in clustering:",
-        ["Institutional features", "Graduation rates"],
-        default=["Institutional features", "Graduation rates"]
-    )
 
     institutional_features = [
         "Total  enrollment",
@@ -128,11 +123,8 @@ with tabs[1]:
 
     grad_features = ["Graduation rate, total cohort", "Graduation rate - Bachelor degree within 6 years, total"]
 
-    selected_features = []
-    if "Institutional features" in feature_groups:
-        selected_features += institutional_features
-    if "Graduation rates" in feature_groups:
-        selected_features += grad_features
+    selected_features = institutional_features + grad_features
+
 
     # Explicitly drop racial disparity columns
     drop_disparity_cols = [f"{race}_disparity" for race in FACULTY_RACE_COLS]
