@@ -3,4 +3,4 @@ pandas
 plotly
 scikit-learn
 umap-learn
-matplotlib
+seaborn
