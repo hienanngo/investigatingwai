@@ -240,9 +240,56 @@ pca_data = pd.get_dummies(pca_data, columns=cat_cols, drop_first=True)
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(pca_data)
 
-# --- Step 6: Run PCA ---
-pca = PCA()
-X_pca = pca.fit_transform(X_scaled)
+# ✅ This is the function (defined above)
+@st.cache_data(show_spinner="🔍 Computing PCA, UMAP, and Clustering...")
+def compute_embeddings(X_scaled, n_clusters):
+    from sklearn.decomposition import PCA
+    import umap.umap_ as umap
+    from sklearn.cluster import KMeans
+
+    # PCA
+    pca_result = PCA(n_components=2).fit_transform(X_scaled)
+
+    # UMAP
+    umap_result = umap.UMAP(random_state=42).fit_transform(X_scaled)
+
+    # KMeans
+    kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+    cluster_labels = kmeans.fit_predict(X_scaled)
+
+    return pca_result, umap_result, cluster_labels
+
+# --- SIDEBAR CONTROLS ---
+st.sidebar.header("⚙️ Clustering Controls")
+
+# Cluster count slider
+num_clusters = st.sidebar.slider(
+    "Number of clusters", min_value=2, max_value=10, value=5, step=1, key="num_clusters"
+)
+
+
+# --- CLEAN & PREP DATA ---
+selected_cols = categorical_features + selected_features + ["institution name_x"]
+thresh = 0.8 * len(filtered_df)
+cluster_df = filtered_df[selected_cols].dropna(axis=1, thresh=thresh)
+cluster_df = cluster_df.dropna()
+
+# Encode categorical variables
+cluster_df_encoded = pd.get_dummies(cluster_df, columns=[col for col in categorical_features if col in cluster_df.columns], drop_first=True)
+
+# Normalize
+scaler = StandardScaler()
+X_scaled = scaler.fit_transform(cluster_df_encoded.drop(columns=["institution name_x"]))
+
+# --- Compute everything (cached) ---
+pca_result, umap_result, cluster_labels = compute_embeddings(X_scaled, num_clusters)
+
+# Add results to your DataFrame
+cluster_df_encoded["PCA_1"] = pca_result[:, 0]
+cluster_df_encoded["PCA_2"] = pca_result[:, 1]
+cluster_df_encoded["UMAP_1"] = umap_result[:, 0]
+cluster_df_encoded["UMAP_2"] = umap_result[:, 1]
+cluster_df_encoded["Cluster"] = cluster_labels
 
 # --- Step 7: Explained Variance Table + Plot ---
 st.subheader("🔍 Variance Explained by Components")
@@ -333,14 +380,6 @@ import plotly.express as px
 
 st.header("🧬 Dimensionality Reduction & Clustering")
 
-# --- SIDEBAR CONTROLS ---
-st.sidebar.header("⚙️ Clustering Controls")
-
-# Cluster count slider
-num_clusters = st.sidebar.slider(
-    "Number of clusters", min_value=2, max_value=10, value=5, step=1, key="num_clusters"
-)
-
 # Feature group selector
 feature_groups = st.sidebar.multiselect(
     "Include in clustering:",
@@ -384,18 +423,6 @@ if "Graduation rates" in feature_groups:
 if "Racial disparities" in feature_groups:
     selected_features += disparity_features
 
-# --- CLEAN & PREP DATA ---
-selected_cols = categorical_cols + selected_features + ["institution name_x"]
-thresh = 0.8 * len(filtered_df)
-cluster_df = filtered_df[selected_cols].dropna(axis=1, thresh=thresh)
-cluster_df = cluster_df.dropna()
-
-# Encode categorical variables
-cluster_df_encoded = pd.get_dummies(cluster_df, columns=[col for col in categorical_cols if col in cluster_df.columns], drop_first=True)
-
-# Normalize
-scaler = StandardScaler()
-X_scaled = scaler.fit_transform(cluster_df_encoded.drop(columns=["institution name_x"]))
 
 # --- PCA ---
 pca_result = PCA(n_components=2).fit_transform(X_scaled)
@@ -421,8 +448,6 @@ for race, col in faculty_race_cols.items():
 
 st.header("🎯 Explore Clusters by Racial Disparity")
 
-# --- Tab for racial disparity view ---
-tabs = st.tabs(["Asian", "Black", "Hispanic", "White", "Two or more", "Native American", "Pacific Islander"])
 
 disparity_races = {
     "Asian": "Asian_disparity",
@@ -442,8 +467,13 @@ vmin = np.percentile(all_disparities, 1)
 vmax = np.percentile(all_disparities, 99)
 abs_max = max(abs(vmin), abs(vmax))  # symmetric range
 
+# Calculate a consistent color range based on 1st–99th percentiles
+all_disparities = cluster_df_encoded[[f"{r}_disparity" for r in faculty_race_cols if f"{r}_disparity" in cluster_df_encoded.columns]].stack()
+vmin = np.percentile(all_disparities, 1)
+vmax = np.percentile(all_disparities, 99)
+abs_max = max(abs(vmin), abs(vmax))  # Symmetric color scale
 
-# Iterate over tabs dynamically
+# Create tabs
 tabs = st.tabs(list(disparity_races.keys()))
 
 for i, (race_label, race_column) in enumerate(disparity_races.items()):
@@ -451,59 +481,53 @@ for i, (race_label, race_column) in enumerate(disparity_races.items()):
         st.subheader(f"{race_label} Disparity by Cluster")
 
         try:
-            # Prepare plotting DataFrame
             plot_df = cluster_df_encoded[[
                 race_column, "PCA_1", "PCA_2", "UMAP_1", "UMAP_2", "Institution", "Cluster"
             ]].copy()
 
-            # Clean column
+            # Clean
             plot_df[race_column] = pd.to_numeric(plot_df[race_column], errors="coerce")
             plot_df = plot_df.dropna(subset=[race_column])
 
-            # Skip if empty
             if plot_df.empty:
-                st.warning(f"No data available for {race_label} disparity.")
+                st.warning(f"⚠️ No data to plot for {race_label}.")
                 continue
 
-            # Write range info
-            st.write(
-                f"{race_label} — Min: {plot_df[race_column].min():.2f}, "
-                f"Max: {plot_df[race_column].max():.2f}, "
-                f"NaNs dropped: {cluster_df_encoded.shape[0] - plot_df.shape[0]}"
-            )
+            # Debug output
+            st.caption(f"Data range: {plot_df[race_column].min():.1f} to {plot_df[race_column].max():.1f} — {plot_df.shape[0]} rows")
 
-            # --- PCA Plot ---
-            fig_pca_disp = px.scatter(
+            # PCA Plot
+            fig_pca = px.scatter(
                 plot_df,
                 x="PCA_1", y="PCA_2",
                 color=race_column,
                 color_continuous_scale="RdBu",
                 range_color=[-abs_max, abs_max],
                 hover_data=["Institution", "Cluster"],
-                title=f"PCA View - {race_label} Disparity"
+                title=f"PCA View – {race_label} Disparity"
             )
-            st.plotly_chart(fig_pca_disp, use_container_width=True)
+            st.plotly_chart(fig_pca, use_container_width=True)
 
-            # --- UMAP Plot ---
-            fig_umap_disp = px.scatter(
+            # UMAP Plot
+            fig_umap = px.scatter(
                 plot_df,
                 x="UMAP_1", y="UMAP_2",
                 color=race_column,
                 color_continuous_scale="RdBu",
                 range_color=[-abs_max, abs_max],
                 hover_data=["Institution", "Cluster"],
-                title=f"UMAP View - {race_label} Disparity"
+                title=f"UMAP View – {race_label} Disparity"
             )
-            st.plotly_chart(fig_umap_disp, use_container_width=True)
+            st.plotly_chart(fig_umap, use_container_width=True)
 
-            # --- Table: average disparity by cluster ---
+            # Cluster mean table
             avg_disp = cluster_df_encoded.groupby("Cluster")[race_column].mean().reset_index()
             avg_disp.columns = ["Cluster", f"Avg {race_label} Disparity"]
-            st.subheader(f"📊 Average {race_label} Disparity per Cluster")
             st.dataframe(avg_disp)
 
         except Exception as e:
-            st.error(f"⚠️ Error while rendering {race_label} tab: {e}")
+            st.error(f"❌ Error rendering {race_label} tab: {e}")
+
 
 
 
