@@ -1,5 +1,11 @@
-
 import streamlit as st
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn.decomposition import PCA
+from sklearn.preprocessing import StandardScaler
+import umap.umap_ as umap
+from sklearn.cluster import KMeans
+import plotly.express as px
 
 # --- Page Setup ---
 st.set_page_config(page_title="Faculty Diversity Dashboard", layout="wide")
@@ -8,8 +14,6 @@ st.title("🎓 Faculty vs. Student Diversity in U.S. Colleges")
 import pandas as pd
 import numpy as np
 import logging
-from sklearn.metrics.pairwise import cosine_similarity
-import matplotlib.pyplot as plt
 
 # --- Load from Google Sheets ---
 def load_data_from_gsheet(sheet_id):
@@ -26,29 +30,29 @@ with st.spinner("📥 Loading data from Google Sheets..."):
 
 # --- Filter to Instructional Staff ---
 faculty_filtered = staff_df[
-    staff_df["S2023_OC.Occupation and full- and part-time status"] == "Instructional staff"
+    staff_df["Occupation and full- and part-time status"] == "Instructional staff"
 ].copy()
-faculty_filtered["total_faculty"] = faculty_filtered["S2023_OC.Grand total"]
+faculty_filtered["total_faculty"] = faculty_filtered["Grand total"]
 
 # --- Race Columns ---
 faculty_race_cols = {
-    "Asian": "S2023_OC.Asian total",
-    "Black": "S2023_OC.Black or African American total",
-    "Hispanic": "S2023_OC.Hispanic or Latino total",
-    "White": "S2023_OC.White total",
-    "Two or more": "S2023_OC.Two or more races total",
-    "Native American": "S2023_OC.American Indian or Alaska Native total",
-    "Pacific Islander": "S2023_OC.Native Hawaiian or Other Pacific Islander total"
+    "Asian": "Asian total",
+    "Black": "Black or African American total",
+    "Hispanic": "Hispanic or Latino total",
+    "White": "White total",
+    "Two or more": "Two or more races total",
+    "Native American": "American Indian or Alaska Native total",
+    "Pacific Islander": "Native Hawaiian or Other Pacific Islander total"
 }
 
 student_race_cols = {
-    "Asian": "DRVEF2023.Percent of total enrollment that are Asian",
-    "Black": "DRVEF2023.Percent of total enrollment that are Black or African American",
-    "Hispanic": "DRVEF2023.Percent of total enrollment that are Hispanic/Latino",
-    "White": "DRVEF2023.Percent of total enrollment that are White",
-    "Two or more": "DRVEF2023.Percent of total enrollment that are two or more races",
-    "Native American": "DRVEF2023.Percent of total enrollment that are American Indian or Alaska Native",
-    "Pacific Islander": "DRVEF2023.Percent of total enrollment that are Native Hawaiian or Other Pacific Islander"
+    "Asian": "Percent of total enrollment that are Asian",
+    "Black": "Percent of total enrollment that are Black or African American",
+    "Hispanic": "Percent of total enrollment that are Hispanic/Latino",
+    "White": "Percent of total enrollment that are White",
+    "Two or more": "Percent of total enrollment that are two or more races",
+    "Native American": "Percent of total enrollment that are American Indian or Alaska Native",
+    "Pacific Islander": "Percent of total enrollment that are Native Hawaiian or Other Pacific Islander"
 }
 
 # --- Normalize faculty race counts to percentages ---
@@ -60,8 +64,8 @@ faculty_subset = faculty_filtered[["unitid", "year"] + [f"{race}_faculty_pct" fo
 
 # --- Prepare student data ---
 student_subset = student_df[["unitid", "institution name", "year", 
-                             "HD2023.Postsecondary and Title IV institution indicator", 
-                             "HD2023.Institutional category"] + list(student_race_cols.values())].copy()
+                             "Postsecondary and Title IV institution indicator", 
+                             "Institutional category"] + list(student_race_cols.values())].copy()
 student_subset.rename(columns={v: f"{k}_student_pct" for k, v in student_race_cols.items()}, inplace=True)
 
 # --- Merge datasets ---
@@ -75,8 +79,8 @@ valid_categories = [
     "Degree-granting, graduate with no undergraduate degrees"
 ]
 merged = merged[
-    (merged["HD2023.Postsecondary and Title IV institution indicator"] == "Title IV postsecondary institution") &
-    (merged["HD2023.Institutional category"].isin(valid_categories))
+    (merged["Postsecondary and Title IV institution indicator"] == "Title IV postsecondary institution") &
+    (merged["Institutional category"].isin(valid_categories))
 ]
 
 # --- Calculate ratios ---
@@ -108,3 +112,88 @@ st.markdown("""
 - **< 1.0** → Underrepresented in faculty.
 - **> 1.0** → Overrepresented in faculty.
 """)
+
+st.markdown("---")
+st.header("📊 Advanced Analysis")
+
+# --- Data prep for advanced analyses ---
+faculty_pct_cols = [f"{race}_faculty_pct" for race in faculty_race_cols]
+X = merged[faculty_pct_cols].fillna(0)
+X_scaled = StandardScaler().fit_transform(X)
+kmeans = KMeans(n_clusters=5, random_state=42)
+clusters = kmeans.fit_predict(X_scaled)
+merged["Cluster"] = clusters
+
+# --- Correlation Matrix ---
+st.subheader("📈 Correlation Between Faculty Race Percentages")
+corr = merged[faculty_pct_cols].corr()
+fig, ax = plt.subplots(figsize=(10, 6))
+sns.heatmap(corr, annot=True, cmap='coolwarm', fmt=".2f", ax=ax)
+st.pyplot(fig)
+st.markdown("This heatmap shows how race representation metrics are correlated among faculty members across institutions.")
+
+st.subheader("🔍 Average Faculty Diversity by Cluster")
+cluster_means = merged.groupby("Cluster")[[f"{race}_faculty_pct" for race in faculty_race_cols]].mean()
+st.dataframe(cluster_means.style.format("{:.2f}"))
+
+# --- PCA ---
+st.subheader("🧭 PCA of Faculty Representation")
+
+# Run PCA
+pca = PCA(n_components=2)
+pca_result = pca.fit_transform(X_scaled)
+pca_df = pd.DataFrame(pca_result, columns=["PC1", "PC2"])
+pca_df["Institution"] = merged["institution name"]
+pca_df["Cluster"] = merged["Cluster"]
+
+# Interactive PCA plot
+fig = px.scatter(
+    pca_df,
+    x="PC1",
+    y="PC2",
+    color=pca_df["Cluster"].astype(str),
+    hover_name="Institution",
+    title="PCA of Faculty Diversity by Institution Cluster",
+    labels={"Cluster": "Cluster"},
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("PCA reduces faculty race data into two dimensions, showing groupings of institutions based on diversity composition. Clusters highlight similar diversity profiles.")
+
+# --- UMAP ---
+st.subheader("🌐 UMAP of Faculty Representation")
+
+# Run UMAP
+umap_model = umap.UMAP(n_neighbors=15, min_dist=0.1, random_state=42)
+umap_result = umap_model.fit_transform(X_scaled)
+umap_df = pd.DataFrame(umap_result, columns=["UMAP1", "UMAP2"])
+umap_df["Institution"] = merged["institution name"]
+umap_df["Cluster"] = merged["Cluster"]
+
+# Interactive UMAP plot
+fig = px.scatter(
+    umap_df,
+    x="UMAP1",
+    y="UMAP2",
+    color=umap_df["Cluster"].astype(str),
+    hover_name="Institution",
+    title="UMAP Projection of Faculty Race Composition",
+    labels={"Cluster": "Cluster"},
+    color_discrete_sequence=px.colors.qualitative.Set2
+)
+st.plotly_chart(fig, use_container_width=True)
+
+st.markdown("UMAP reveals nuanced local relationships in the diversity data, preserving structure among institutions without text clutter.")
+
+# --- Clustering ---
+st.subheader("🧩 Clustering Institutions by Faculty Composition")
+kmeans = KMeans(n_clusters=5, random_state=42)
+clusters = kmeans.fit_predict(X_scaled)
+merged["Cluster"] = clusters
+pca_df["Cluster"] = clusters
+
+fig, ax = plt.subplots(figsize=(10, 6))
+sns.scatterplot(data=pca_df, x="PC1", y="PC2", hue="Cluster", palette="Set2", s=80)
+st.pyplot(fig)
+st.markdown("This KMeans clustering shows how institutions group based on similarities in their faculty diversity makeup.")
