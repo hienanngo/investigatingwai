@@ -107,3 +107,4 @@ st.markdown("""
 - Positive values = Overrepresentation in faculty
 - Negative values = Underrepresentation in faculty
 """)
+

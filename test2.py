@@ -147,7 +147,10 @@ cluster_df_encoded["Institution"] = cluster_df["institution name_student"].value
 
 # --- Show Data Summary ---
 st.subheader("📊 Cluster Sizes")
-st.dataframe(cluster_df_encoded["Cluster"].value_counts().reset_index().rename(columns={"index": "Cluster", "Cluster": "Count"}))
+st.text("In this dashboard, a cluster represents a group of colleges or universities that share similar characteristics based on various metrics such as racial disparities between faculty and students, graduation rates by race, total enrollment, tuition costs, admission rates, and institutional type. Using the K-Means clustering algorithm, schools are grouped together based on patterns in this data, with each cluster reflecting a unique profile of institutional behavior and demographic makeup. The clusters are visualized using PCA and UMAP, which reduce the high-dimensional data into two dimensions for easy interpretation—schools positioned close together in the plots are more similar. Interpreting these clusters allows users to identify meaningful patterns, such as which types of institutions tend to have higher or lower racial disparities, or how factors like being public or private relate to faculty diversity.")
+cluster_counts = cluster_df_encoded["Cluster"].value_counts().reset_index()
+cluster_counts.columns = ["Cluster", "Count"]
+st.dataframe(cluster_counts)
 
 # --- PCA/UMAP Plots ---
 st.subheader("🗺️ Cluster Visualization")
@@ -160,6 +163,8 @@ fig_pca = px.scatter(
 )
 st.plotly_chart(fig_pca, use_container_width=True)
 
+st.text("Principal Component Analysis (PCA) reduces the dimensionality of the data by identifying the directions (principal components) of maximum variance. The first two principal components are visualized on a 2D plot, showing how institutions differ based on features like enrollment, tuition, and racial disparities. Institutions closer together in the PCA plot share similar characteristics, while those farther apart have distinct profiles, such as differing levels of faculty diversity or graduation rates.")
+
 fig_umap = px.scatter(
     cluster_df_encoded,
     x="UMAP_1", y="UMAP_2",
@@ -168,3 +173,43 @@ fig_umap = px.scatter(
     title="UMAP Projection"
 )
 st.plotly_chart(fig_umap, use_container_width=True)
+
+st.text("UMAP (Uniform Manifold Approximation and Projection) also reduces dimensionality but focuses on preserving both local and global relationships in the data. It creates a 2D map where similar institutions are grouped together, revealing more complex patterns that may not be captured by PCA. UMAP is useful for uncovering subtle clusters based on faculty-student racial disparities and other institutional features.")
+
+# st.write(cluster_df_encoded.columns)
+
+# --- Correlation Matrix of Disparities vs. Graduation Rates ---
+st.subheader("📈 Correlation Matrix of Disparities vs. Graduation Rates")
+
+# Prepare the columns for the correlation matrix
+# First, prepare the list of disparities and graduation rates
+disparity_columns = [f"{race}_disparity" for race in faculty_race_cols]
+grad_rate_columns = [
+    "Graduation rate, Black, non-Hispanic", 
+    "Graduation rate, White, non-Hispanic", 
+    "Graduation rate, two or more races", 
+    "Graduation rate, American Indian or Alaska Native",
+    "Graduation rate, Native Hawaiian or Other Pacific Islander"
+]
+
+# Extract the relevant columns from the DataFrame for correlation
+grad_rate_disparity_columns = disparity_columns + grad_rate_columns
+numeric_cols = cluster_df_encoded[grad_rate_disparity_columns]
+
+# Compute the correlation matrix
+corr_matrix = numeric_cols.corr()
+
+# Only select the part of the matrix where disparities are on the x-axis and graduation rates on the y-axis
+corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
+
+# Plot the correlation matrix using Seaborn
+fig_corr, ax = plt.subplots(figsize=(18, 12))
+sns.heatmap(corr_matrix_selected, annot=True, cmap="YlGnBu", center=0, linewidths=0.5, ax=ax)
+ax.set_title("Correlation Matrix of Disparities vs. Graduation Rates", fontsize=16)
+ax.set_xlabel('Faculty-Student Disparity')
+ax.set_ylabel('Graduation Rate')
+
+st.pyplot(fig_corr)
+
+# Explanation Text
+st.text("The correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. Each row corresponds to the graduation rate for a specific racial group, and each column represents the disparity in faculty composition for that group. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")
