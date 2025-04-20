@@ -16,6 +16,7 @@ from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 import umap.umap_ as umap
+import plotly.figure_factory as ff
 
 # --- Constants ---
 CATEGORICAL_FEATURES = [
@@ -72,7 +73,7 @@ def get_filtered_df(merged, selected_state, selected_control, selected_degree, s
 filtered_df = get_filtered_df(merged, selected_state, selected_control, selected_degree, selected_urban)
 
 # --- Tabs ---
-tabs = st.tabs(["📋 Overview", "🧠 PCA & UMAP", "🎯 Disparity Clusters", "📈 Regression"])
+tabs = st.tabs(["📋 Overview", "🧠 PCA & UMAP", "🎯 Disparity Clusters", "📈 Regression", "📊 Correlation Matrix"])
 
 # === 📋 Overview ===
 with tabs[0]:
@@ -282,35 +283,113 @@ with tabs[3]:
     st.dataframe(vif_df)
 
     st.write("### 🧮 Linear Regression Results")
-    X = reg_df[reg_features]
-    y = reg_df[disparity_var]
+    # --- Calculate Disparities ---
+    merged["faculty_total"] = merged["Grand total"]
+    for race in FACULTY_RACE_COLS:
+        merged[f"{race}_faculty_pct"] = (merged[FACULTY_RACE_COLS[race]] / merged["faculty_total"]) * 100
+        merged[f"{race}_student_pct"] = merged[STUDENT_RACE_COLS[race]]
+        merged[f"{race}_disparity"] = merged[f"{race}_faculty_pct"] - merged[f"{race}_student_pct"]
+
+    # --- Regression Model ---
+
+    # Using selected race for disparity and graduation rate
+    disparity_column = f"{selected_race}_disparity"
+    grad_rate_column = f"Graduation rate, {selected_race}"  # Adjust according to your dataset
+
+    # Ensure X and y have the same index by aligning them
+    X = merged[[disparity_column]].dropna()  # Independent variable (disparity)
+    y = merged[grad_rate_column].dropna()  # Dependent variable (graduation rate)
+
+    # Align indices to avoid the mismatch error
+    X, y = X.align(y, join='inner', axis=0)
+
+    # Adding a constant to the model (intercept)
     X = sm.add_constant(X)
+
+    # Fit the regression model
     model = sm.OLS(y, X).fit()
 
-    st.markdown(model.summary().as_html(), unsafe_allow_html=True)
+    # Show model summary in Streamlit
+    st.subheader(f"📈 Regression Model: Disparity vs. Graduation Rate ({selected_race})")
+    st.write(model.summary())
 
-    st.write("### 📊 Regression Diagnostics")
-    predictions = model.predict(X)
-    residuals = y - predictions
+    # --- Plotting Regression Line ---
+    plt.figure(figsize=(10, 6))
+    plt.scatter(X[disparity_column], y, label="Data", color="blue", alpha=0.5)
+    plt.plot(X[disparity_column], model.predict(X), label="Fitted Line", color="red", linewidth=2)
+    plt.title(f"Disparity vs. Graduation Rate ({selected_race}) - Regression Line")
+    plt.xlabel(f"Faculty-Student Disparity ({selected_race})")
+    plt.ylabel(f"Graduation Rate ({selected_race})")
+    plt.legend()
+    st.pyplot(plt)
 
-    col1, col2 = st.columns(2)
+# --- 📊 Interactive Correlation Matrix --- 
+with tabs[4]:
+    st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
+    categorical_features = [
+        "Public/Private",
+        "Degree of urbanization (Urban-centric locale)",
+        "Institutional category"
+    ]
 
-    with col1:
-        st.write("**Residuals vs. Fitted**")
-        fig, ax = plt.subplots()
-        ax.scatter(predictions, residuals, alpha=0.5)
-        ax.axhline(0, linestyle='--', color='grey')
-        ax.set_xlabel("Fitted Values")
-        ax.set_ylabel("Residuals")
-        st.pyplot(fig)
+    numerical_features = [
+        "Total  enrollment",
+        "Tuition and fees, 2023-24",
+        "Percent admitted - total",
+        "Graduation rate, total cohort"
+    ] + GRAD_RATE_COLS + [f"{r}_disparity" for r in FACULTY_RACE_COLS]
 
-    with col2:
-        st.write("**Q-Q Plot of Residuals**")
-        fig = sm.qqplot(residuals, line='45', fit=True)
-        st.pyplot(fig)
+    cluster_df = merged[numerical_features + categorical_features].dropna()
+    cluster_df_encoded = pd.get_dummies(cluster_df, columns=categorical_features, drop_first=True)
 
-    st.write("**Histogram of Residuals**")
-    fig, ax = plt.subplots()
-    sns.histplot(residuals, kde=True, ax=ax)
-    ax.set_title("Distribution of Residuals")
-    st.pyplot(fig)
+    # Prepare the columns for the correlation matrix
+    disparity_columns = [f"{race}_disparity" for race in FACULTY_RACE_COLS]
+    grad_rate_columns = [
+        "Graduation rate, Black, non-Hispanic", 
+        "Graduation rate, White, non-Hispanic", 
+        "Graduation rate, two or more races", 
+        "Graduation rate, American Indian or Alaska Native",
+        "Graduation rate, Native Hawaiian or Other Pacific Islander"
+    ]
+
+    # Extract the relevant columns from the DataFrame for correlation
+    grad_rate_disparity_columns = disparity_columns + grad_rate_columns
+    numeric_cols = cluster_df_encoded[grad_rate_disparity_columns]
+
+    # Compute the correlation matrix
+    corr_matrix = numeric_cols.corr()
+
+    # Only select the part of the matrix where disparities are on the x-axis and graduation rates on the y-axis
+    corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
+    rounded_values = np.round(corr_matrix_selected.values, 2)
+
+    # Convert the correlation matrix data into a numpy array for Plotly compatibility
+    z_values = rounded_values
+    x_labels = list(corr_matrix_selected.columns)
+    y_labels = list(corr_matrix_selected.index)
+
+    # Create the Plotly heatmap for the correlation matrix
+    fig_corr = ff.create_annotated_heatmap(
+        z=z_values,
+        x=x_labels,
+        y=y_labels,
+        colorscale='YlGnBu',
+        showscale=True,
+        colorbar_title="Correlation Coefficient"
+    )
+
+    # Update layout for better readability and presentation
+    fig_corr.update_layout(
+        title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
+        xaxis_title="Faculty-Student Disparity",
+        yaxis_title="Graduation Rate",
+        width=800,
+        height=600,
+        template="plotly_dark"
+    )
+
+    # Display the interactive correlation matrix
+    st.plotly_chart(fig_corr, use_container_width=True)
+
+    # Explanation Text
+    st.text("The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")

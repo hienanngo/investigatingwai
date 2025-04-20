@@ -127,6 +127,75 @@ X_scaled = scaler.fit_transform(cluster_df_encoded.drop(columns=["institution na
 st.sidebar.header("⚙️ Clustering Controls")
 num_clusters = st.sidebar.slider("Number of clusters", min_value=2, max_value=10, value=5)
 
+# --- Calculate Disparities ---
+merged["faculty_total"] = merged["Grand total"]
+for race in faculty_race_cols:
+    merged[f"{race}_faculty_pct"] = (merged[faculty_race_cols[race]] / merged["faculty_total"]) * 100
+    merged[f"{race}_student_pct"] = merged[student_race_cols[race]]
+    merged[f"{race}_disparity"] = merged[f"{race}_faculty_pct"] - merged[f"{race}_student_pct"]
+
+# --- Calculate Disparities ---
+merged["faculty_total"] = merged["Grand total"]
+for race in faculty_race_cols:
+    merged[f"{race}_faculty_pct"] = (merged[faculty_race_cols[race]] / merged["faculty_total"]) * 100
+    merged[f"{race}_student_pct"] = merged[student_race_cols[race]]
+    merged[f"{race}_disparity"] = merged[f"{race}_faculty_pct"] - merged[f"{race}_student_pct"]
+
+# --- Calculate Disparities ---
+merged["faculty_total"] = merged["Grand total"]
+for race in faculty_race_cols:
+    merged[f"{race}_faculty_pct"] = (merged[faculty_race_cols[race]] / merged["faculty_total"]) * 100
+    merged[f"{race}_student_pct"] = merged[student_race_cols[race]]
+    merged[f"{race}_disparity"] = merged[f"{race}_faculty_pct"] - merged[f"{race}_student_pct"]
+
+# --- Regression Model ---
+# Dropdown to select race
+race_selection = st.selectbox(
+    "Select Race for Regression Model",
+    options=["Black", "Asian", "Hispanic", "White", "Two or more", "Native American", "Pacific Islander"]
+)
+
+# Using selected race for disparity and graduation rate
+disparity_column = f"{race_selection}_disparity"
+grad_rate_column = f"Graduation rate, {race_selection}, non-Hispanic"  # Adjust according to your dataset
+
+# Ensure X and y have the same index by aligning them
+X = merged[[disparity_column]].dropna()  # Independent variable (disparity)
+y = merged[grad_rate_column].dropna()  # Dependent variable (graduation rate)
+
+# Align indices to avoid the mismatch error
+X, y = X.align(y, join='inner', axis=0)
+
+# Adding a constant to the model (intercept)
+X = sm.add_constant(X)
+
+# Fit the regression model
+model = sm.OLS(y, X).fit()
+
+# Show model summary in Streamlit
+st.subheader(f"📈 Regression Model: Disparity vs. Graduation Rate ({race_selection})")
+st.write(model.summary())
+
+# --- Plotting Regression Line ---
+plt.figure(figsize=(10, 6))
+plt.scatter(X[disparity_column], y, label="Data", color="blue", alpha=0.5)
+plt.plot(X[disparity_column], model.predict(X), label="Fitted Line", color="red", linewidth=2)
+plt.title(f"Disparity vs. Graduation Rate ({race_selection}) - Regression Line")
+plt.xlabel(f"Faculty-Student Disparity ({race_selection})")
+plt.ylabel(f"Graduation Rate ({race_selection})")
+plt.legend()
+st.pyplot(plt)
+
+# --- Compute Embeddings (cached) ---
+@st.cache_data(show_spinner="🔍 Computing PCA, UMAP, and Clustering...")
+def compute_embeddings(X, k):
+    pca_result = PCA(n_components=2).fit_transform(X)
+    umap_result = umap.UMAP(random_state=42).fit_transform(X)
+    cluster_labels = KMeans(n_clusters=k, random_state=42).fit_predict(X)
+    return pca_result, umap_result, cluster_labels
+
+pca_result, umap_result, cluster_labels = compute_embeddings(X_scaled, 5)
+
 # --- Compute Embeddings (cached) ---
 @st.cache_data(show_spinner="🔍 Computing PCA, UMAP, and Clustering...")
 def compute_embeddings(X, k):
