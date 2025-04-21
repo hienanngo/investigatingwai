@@ -358,14 +358,16 @@ with tabs[4]:
         "Tuition and fees, 2023-24",
         "Percent admitted - total",
         "Graduation rate, total cohort"
-    ] + GRAD_RATE_COLS + [f"{r}_disparity" for r in FACULTY_RACE_COLS]
+    ] + [col for col in GRAD_RATE_COLS if col in merged.columns] + [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
 
-    cluster_df = merged[numerical_features + categorical_features].dropna()
-    cluster_df_encoded = pd.get_dummies(cluster_df, columns=categorical_features, drop_first=True)
-    cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()  # 🔧 Sanitize for deployment
+    # ✅ Safely select columns that exist
+    available_features = [col for col in numerical_features + categorical_features if col in merged.columns]
+    cluster_df = merged[available_features].dropna()
 
-    # Prepare the columns for the correlation matrix
-    disparity_columns = [f"{race}_disparity" for race in FACULTY_RACE_COLS]
+    cluster_df_encoded = pd.get_dummies(cluster_df, columns=[col for col in categorical_features if col in cluster_df.columns], drop_first=True)
+    cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
+
+    disparity_columns = [f"{race}_disparity" for race in FACULTY_RACE_COLS if f"{race}_disparity" in cluster_df_encoded.columns]
     grad_rate_columns = [
         "Graduation rate, Black, non-Hispanic", 
         "Graduation rate, White, non-Hispanic", 
@@ -373,26 +375,22 @@ with tabs[4]:
         "Graduation rate, American Indian or Alaska Native",
         "Graduation rate, Native Hawaiian or Other Pacific Islander"
     ]
+    grad_rate_columns = [col for col in grad_rate_columns if col in cluster_df_encoded.columns]
 
-    # Extract the relevant columns from the DataFrame for correlation
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
     numeric_cols = cluster_df_encoded[grad_rate_disparity_columns]
-    numeric_cols = numeric_cols.select_dtypes(include=[np.number])  # 🔧 Ensure numeric only
+    numeric_cols = numeric_cols.select_dtypes(include=[np.number])
 
-    # Compute the correlation matrix
     corr_matrix = numeric_cols.corr()
-
-    # Only select the part of the matrix where disparities are on the x-axis and graduation rates on the y-axis
     corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
     rounded_values = np.round(corr_matrix_selected.values, 2)
 
-    z_values = rounded_values
     x_labels = list(corr_matrix_selected.columns)
     y_labels = list(corr_matrix_selected.index)
 
     try:
         fig_corr = ff.create_annotated_heatmap(
-            z=z_values,
+            z=rounded_values,
             x=x_labels,
             y=y_labels,
             colorscale='YlGnBu',
@@ -429,10 +427,10 @@ with tabs[4]:
                     cramers_v_matrix.loc[col1, col2] = 1.0
         return cramers_v_matrix
 
-    numeric_df = cluster_df_encoded[numerical_features].copy()
+    numeric_df = cluster_df_encoded[[col for col in numerical_features if col in cluster_df_encoded.columns]].copy()
     pearson_corr_matrix = numeric_df.corr()
 
-    cramers_v_corr_matrix = cramers_v_matrix(cluster_df, categorical_features)
+    cramers_v_corr_matrix = cramers_v_matrix(cluster_df, [col for col in categorical_features if col in cluster_df.columns])
 
     st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
     st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
