@@ -374,27 +374,47 @@ with tabs[4]:
         "Graduation rate, total cohort"
     ] + [col for col in GRAD_RATE_COLS if col in merged.columns] + [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
 
-    # ✅ Safely select columns that exist
+    # ✅ Safely select available columns
     available_features = [col for col in numerical_features + categorical_features if col in merged.columns]
     cluster_df = merged[available_features].dropna()
 
     cluster_df_encoded = pd.get_dummies(cluster_df, columns=[col for col in categorical_features if col in cluster_df.columns], drop_first=True)
     cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
 
-    disparity_columns = [f"{race}_disparity" for race in FACULTY_RACE_COLS if f"{race}_disparity" in cluster_df_encoded.columns]
-    grad_rate_columns = [
-        "Graduation rate, Black, non-Hispanic", 
-        "Graduation rate, White, non-Hispanic", 
-        "Graduation rate, two or more races", 
-        "Graduation rate, American Indian or Alaska Native",
-        "Graduation rate, Native Hawaiian or Other Pacific Islander"
+    # ✅ Define consistent race labels as used in both grad rate and disparity columns
+    race_order = [
+        ("Asian", "Pacific Islander"),
+        ("White, non-Hispanic", "Two or more"),
+        ("Black, non-Hispanic", "Hispanic"),
+        ("American Indian or Alaska Native", "Native American"),
+        ("Hispanic", "Black"),
+        ("two or more races", "White"),
+        ("Native Hawaiian or Other Pacific Islander", "Asian")
     ]
-    grad_rate_columns = [col for col in grad_rate_columns if col in cluster_df_encoded.columns]
 
+    # ✅ Dynamically collect columns that exist in the dataframe
+    disparity_columns = []
+    grad_rate_columns = []
+
+    for grad_label, disparity_key in race_order:
+        grad_col = f"Graduation rate, {grad_label}"
+        disparity_col = f"{disparity_key}_disparity"
+
+        if grad_col in cluster_df_encoded.columns:
+            grad_rate_columns.append(grad_col)
+        else:
+            print(f"⚠️ Missing graduation column: {grad_col}")
+
+        if disparity_col in cluster_df_encoded.columns:
+            disparity_columns.append(disparity_col)
+        else:
+            print(f"⚠️ Missing disparity column: {disparity_col}")
+
+    # ✅ Select relevant numeric data
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
-    numeric_cols = cluster_df_encoded[grad_rate_disparity_columns]
-    numeric_cols = numeric_cols.select_dtypes(include=[np.number])
+    numeric_cols = cluster_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
 
+    # ✅ Correlation matrix
     corr_matrix = numeric_cols.corr()
     corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
     rounded_values = np.round(corr_matrix_selected.values, 2)
@@ -402,15 +422,29 @@ with tabs[4]:
     x_labels = list(corr_matrix_selected.columns)
     y_labels = list(corr_matrix_selected.index)
 
+    # ✅ Plot with dynamic text contrast
     try:
         fig_corr = ff.create_annotated_heatmap(
-            z=rounded_values,
-            x=x_labels,
-            y=y_labels,
-            colorscale='YlGnBu',
-            showscale=True,
-            colorbar_title="Correlation Coefficient"
+        z=rounded_values,
+        x=x_labels,
+        y=y_labels,
+        colorscale='YlGnBu',
+        showscale=True,
+        colorbar_title="Correlation Coefficient",
+        annotation_text=[[f"{val:.2f}" for val in row] for row in rounded_values]
         )
+
+        # 🔁 Dynamically adjust font color for contrast based on value
+        for i, ann in enumerate(fig_corr.layout.annotations):
+            # Convert flat index to 2D indices
+            row = i // len(x_labels)
+            col = i % len(x_labels)
+            val = rounded_values[row][col]
+
+            # Adjust contrast: light background → dark text, and vice versa
+            ann.font.color = 'black' if abs(val) < 0.25 else 'white'
+
+        # Layout settings
         fig_corr.update_layout(
             title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
             xaxis_title="Faculty-Student Disparity",
@@ -419,9 +453,12 @@ with tabs[4]:
             height=600,
             template="plotly_dark"
         )
+
         st.plotly_chart(fig_corr, use_container_width=True)
+
     except Exception as e:
         st.error(f"❌ Error rendering correlation heatmap: {e}")
+
 
     st.text("The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")
 
