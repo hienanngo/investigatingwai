@@ -447,7 +447,7 @@ with tabs[4]:
     for grad_label, disparity_key in race_order:
         grad_col = None
         for col_option in grad_rate_column_options.get(disparity_key, []):
-            if col_option in cluster_df_encoded.columns:
+            if col_option in cluster_df.columns:  # Match against original cluster_df, not encoded
                 grad_col = col_option
                 break
 
@@ -458,11 +458,10 @@ with tabs[4]:
         else:
             print(f"⚠️ Missing graduation column: {grad_label}")
 
-        if disparity_col in cluster_df_encoded.columns:
+        if disparity_col in cluster_df.columns:
             disparity_columns.append(disparity_col)
         else:
             print(f"⚠️ Missing disparity column: {disparity_col}")
-
 
 
     # ✅ Select relevant numeric data
