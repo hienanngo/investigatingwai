@@ -1,6 +1,6 @@
-streamlit
-pandas
-plotly
+streamlit==1.31.1
+plotly==5.18.0
+pandas>=1.5
 scikit-learn
 umap-learn
 seaborn

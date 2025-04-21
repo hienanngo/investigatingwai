@@ -7,6 +7,9 @@ import seaborn as sns
 import statsmodels.api as sm
 import matplotlib.pyplot as plt
 from statsmodels.stats.outliers_influence import variance_inflation_factor
+import plotly.figure_factory as ff
+from scipy.stats import chi2_contingency
+
 
 from config import *
 from data_loader import load_data_from_gsheet, merge_and_clean
@@ -136,11 +139,14 @@ with tabs[1]:
 
     column_thresh = 0.7 * len(pca_data)
     pca_data = pca_data.dropna(axis=1, thresh=column_thresh)
+    pca_data = pca_data.replace([np.inf, -np.inf], np.nan)
     pca_data = pca_data.dropna()
 
     st.caption(f"📊 Institutions included in PCA/UMAP: {pca_data.shape[0]}")
 
     X_features = pd.get_dummies(pca_data.drop(columns=["institution name_x"]), drop_first=True)
+    X_features = X_features.select_dtypes(include=[np.number])  # Only keep numeric
+    X_features = X_features.replace([np.inf, -np.inf], np.nan).dropna()  # Drop inf/nan
     scaler = StandardScaler()
     X_scaled = scaler.fit_transform(X_features)
 
@@ -267,7 +273,11 @@ with tabs[3]:
         "endowment_per_fte"
     ]
 
-    reg_df = filtered_df[[disparity_var] + reg_features].dropna()
+    reg_df = filtered_df[[disparity_var] + reg_features + ["Public/Private"]].dropna()
+    reg_df = pd.get_dummies(reg_df, columns=["Public/Private"], drop_first=True)
+
+    public_private_dummies = [col for col in reg_df.columns if col.startswith("Public/Private_")]
+    reg_features += public_private_dummies
 
     st.write("### 🔍 Correlation with Disparity")
     corr_matrix = reg_df.corr()[[disparity_var]].drop(index=disparity_var)
@@ -277,12 +287,21 @@ with tabs[3]:
     sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", center=0)
     st.pyplot(fig)
 
+# === 🧮 Variance Inflation Factor (VIF) ===
     st.write("### 🧮 Variance Inflation Factor (VIF)")
+
+    # Ensure all features used in VIF calculation are numeric and valid
     X_vif = sm.add_constant(reg_df[reg_features])
+    X_vif = X_vif.select_dtypes(include=[np.number])  # Drop non-numeric columns
+    X_vif = X_vif.replace([np.inf, -np.inf], np.nan).dropna()  # Remove inf/nan rows
+
+    # Compute VIFs
     vif_df = pd.DataFrame()
     vif_df["Feature"] = X_vif.columns
     vif_df["VIF"] = [variance_inflation_factor(X_vif.values, i) for i in range(X_vif.shape[1])]
+
     st.dataframe(vif_df)
+
 
     st.write("### 🧮 Linear Regression Results")
     # --- Calculate Disparities ---
@@ -343,6 +362,7 @@ with tabs[4]:
 
     cluster_df = merged[numerical_features + categorical_features].dropna()
     cluster_df_encoded = pd.get_dummies(cluster_df, columns=categorical_features, drop_first=True)
+    cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()  # 🔧 Sanitize for deployment
 
     # Prepare the columns for the correlation matrix
     disparity_columns = [f"{race}_disparity" for race in FACULTY_RACE_COLS]
@@ -357,6 +377,7 @@ with tabs[4]:
     # Extract the relevant columns from the DataFrame for correlation
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
     numeric_cols = cluster_df_encoded[grad_rate_disparity_columns]
+    numeric_cols = numeric_cols.select_dtypes(include=[np.number])  # 🔧 Ensure numeric only
 
     # Compute the correlation matrix
     corr_matrix = numeric_cols.corr()
@@ -365,35 +386,31 @@ with tabs[4]:
     corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
     rounded_values = np.round(corr_matrix_selected.values, 2)
 
-    # Convert the correlation matrix data into a numpy array for Plotly compatibility
     z_values = rounded_values
     x_labels = list(corr_matrix_selected.columns)
     y_labels = list(corr_matrix_selected.index)
 
-    # Create the Plotly heatmap for the correlation matrix
-    fig_corr = ff.create_annotated_heatmap(
-        z=z_values,
-        x=x_labels,
-        y=y_labels,
-        colorscale='YlGnBu',
-        showscale=True,
-        colorbar_title="Correlation Coefficient"
-    )
+    try:
+        fig_corr = ff.create_annotated_heatmap(
+            z=z_values,
+            x=x_labels,
+            y=y_labels,
+            colorscale='YlGnBu',
+            showscale=True,
+            colorbar_title="Correlation Coefficient"
+        )
+        fig_corr.update_layout(
+            title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
+            xaxis_title="Faculty-Student Disparity",
+            yaxis_title="Graduation Rate",
+            width=800,
+            height=600,
+            template="plotly_dark"
+        )
+        st.plotly_chart(fig_corr, use_container_width=True)
+    except Exception as e:
+        st.error(f"❌ Error rendering correlation heatmap: {e}")
 
-    # Update layout for better readability and presentation
-    fig_corr.update_layout(
-        title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
-        xaxis_title="Faculty-Student Disparity",
-        yaxis_title="Graduation Rate",
-        width=800,
-        height=600,
-        template="plotly_dark"
-    )
-
-    # Display the interactive correlation matrix
-    st.plotly_chart(fig_corr, use_container_width=True)
-
-    # Explanation Text
     st.text("The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")
 
     def cramers_v(cat1, cat2):
@@ -402,33 +419,24 @@ with tabs[4]:
         n = confusion_matrix.sum().sum()
         return np.sqrt(chi2 / (n * (min(confusion_matrix.shape) - 1)))
 
-    # Function to compute Cramér's V for all categorical pairs in a dataframe
     def cramers_v_matrix(df, categorical_columns):
         cramers_v_matrix = pd.DataFrame(index=categorical_columns, columns=categorical_columns)
-        
         for col1 in categorical_columns:
             for col2 in categorical_columns:
                 if col1 != col2:
                     cramers_v_matrix.loc[col1, col2] = cramers_v(df[col1], df[col2])
                 else:
-                    cramers_v_matrix.loc[col1, col2] = 1.0  # Cramér's V with itself is 1.0
+                    cramers_v_matrix.loc[col1, col2] = 1.0
         return cramers_v_matrix
-    
-    # --- Pearson correlation for numeric features ---
+
     numeric_df = cluster_df_encoded[numerical_features].copy()
     pearson_corr_matrix = numeric_df.corr()
 
-    # --- Cramér's V for categorical features ---
     cramers_v_corr_matrix = cramers_v_matrix(cluster_df, categorical_features)
 
-    # Now, combine both correlation matrices into one
-    # Cramér's V matrix will be for categorical vs categorical, and Pearson will be for numeric vs numeric.
-    
-    # Pearson (numeric-numeric) correlation
     st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
     st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
 
-    # Create the Plotly heatmap for Pearson correlation matrix
     fig_pearson = ff.create_annotated_heatmap(
         z=pearson_corr_matrix.values.round(2),
         x=list(pearson_corr_matrix.columns),
@@ -437,8 +445,6 @@ with tabs[4]:
         showscale=True,
         colorbar_title="Pearson Correlation"
     )
-
-    # Update layout for Pearson heatmap
     fig_pearson.update_layout(
         title="Pearson Correlation Matrix (Numeric Features)",
         xaxis_title="Numeric Features",
@@ -447,14 +453,11 @@ with tabs[4]:
         height=900,
         template="plotly_dark"
     )
-
     st.plotly_chart(fig_pearson, use_container_width=True)
 
-    # Cramér's V (categorical-categorical) correlation
     st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
     st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
 
-    # Create the Plotly heatmap for Cramér's V correlation matrix
     fig_cramers_v = ff.create_annotated_heatmap(
         z=cramers_v_corr_matrix.values.astype(float).round(2),
         x=list(cramers_v_corr_matrix.columns),
@@ -463,8 +466,6 @@ with tabs[4]:
         showscale=True,
         colorbar_title="Cramér's V"
     )
-
-    # Update layout for Cramér's V heatmap
     fig_cramers_v.update_layout(
         title="Cramér's V Correlation Matrix (Categorical Features)",
         xaxis_title="Categorical Features",
@@ -473,10 +474,8 @@ with tabs[4]:
         height=600,
         template="plotly_dark"
     )
-
     st.plotly_chart(fig_cramers_v, use_container_width=True)
-    
-    # Explanation Text
+
     st.text("""
     The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
     The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
