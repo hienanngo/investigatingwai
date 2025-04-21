@@ -283,7 +283,7 @@ with tabs[3]:
     st.dataframe(corr_matrix.style.format("{:.2f}"))
 
     fig, ax = plt.subplots()
-    sns.heatmap(corr_matrix, annot=True, cmap="coolwarm", center=0)
+    sns.heatmap(corr_matrix, annot=True, cmap="magma", center=0)
     st.pyplot(fig)
 
 # === 🧮 Variance Inflation Factor (VIF) ===
