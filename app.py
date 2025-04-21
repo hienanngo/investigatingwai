@@ -17,6 +17,8 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.cluster import KMeans
 import umap.umap_ as umap
 import plotly.figure_factory as ff
+import scipy.stats as ss
+from scipy.stats import chi2_contingency
 
 # --- Constants ---
 CATEGORICAL_FEATURES = [
@@ -393,3 +395,90 @@ with tabs[4]:
 
     # Explanation Text
     st.text("The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")
+
+    def cramers_v(cat1, cat2):
+        confusion_matrix = pd.crosstab(cat1, cat2)
+        chi2, p, dof, expected = ss.chi2_contingency(confusion_matrix)
+        n = confusion_matrix.sum().sum()
+        return np.sqrt(chi2 / (n * (min(confusion_matrix.shape) - 1)))
+
+    # Function to compute Cramér's V for all categorical pairs in a dataframe
+    def cramers_v_matrix(df, categorical_columns):
+        cramers_v_matrix = pd.DataFrame(index=categorical_columns, columns=categorical_columns)
+        
+        for col1 in categorical_columns:
+            for col2 in categorical_columns:
+                if col1 != col2:
+                    cramers_v_matrix.loc[col1, col2] = cramers_v(df[col1], df[col2])
+                else:
+                    cramers_v_matrix.loc[col1, col2] = 1.0  # Cramér's V with itself is 1.0
+        return cramers_v_matrix
+    
+    # --- Pearson correlation for numeric features ---
+    numeric_df = cluster_df_encoded[numerical_features].copy()
+    pearson_corr_matrix = numeric_df.corr()
+
+    # --- Cramér's V for categorical features ---
+    cramers_v_corr_matrix = cramers_v_matrix(cluster_df, categorical_features)
+
+    # Now, combine both correlation matrices into one
+    # Cramér's V matrix will be for categorical vs categorical, and Pearson will be for numeric vs numeric.
+    
+    # Pearson (numeric-numeric) correlation
+    st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
+    st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
+
+    # Create the Plotly heatmap for Pearson correlation matrix
+    fig_pearson = ff.create_annotated_heatmap(
+        z=pearson_corr_matrix.values.round(2),
+        x=list(pearson_corr_matrix.columns),
+        y=list(pearson_corr_matrix.index),
+        colorscale='YlGnBu',
+        showscale=True,
+        colorbar_title="Pearson Correlation"
+    )
+
+    # Update layout for Pearson heatmap
+    fig_pearson.update_layout(
+        title="Pearson Correlation Matrix (Numeric Features)",
+        xaxis_title="Numeric Features",
+        yaxis_title="Numeric Features",
+        width=800,
+        height=900,
+        template="plotly_dark"
+    )
+
+    st.plotly_chart(fig_pearson, use_container_width=True)
+
+    # Cramér's V (categorical-categorical) correlation
+    st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
+    st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
+
+    # Create the Plotly heatmap for Cramér's V correlation matrix
+    fig_cramers_v = ff.create_annotated_heatmap(
+        z=cramers_v_corr_matrix.values.astype(float).round(2),
+        x=list(cramers_v_corr_matrix.columns),
+        y=list(cramers_v_corr_matrix.index),
+        colorscale='YlGnBu',
+        showscale=True,
+        colorbar_title="Cramér's V"
+    )
+
+    # Update layout for Cramér's V heatmap
+    fig_cramers_v.update_layout(
+        title="Cramér's V Correlation Matrix (Categorical Features)",
+        xaxis_title="Categorical Features",
+        yaxis_title="Categorical Features",
+        width=800,
+        height=600,
+        template="plotly_dark"
+    )
+
+    st.plotly_chart(fig_cramers_v, use_container_width=True)
+    
+    # Explanation Text
+    st.text("""
+    The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
+    The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
+    You can hover over the cells to see the exact values for each correlation.
+    """)
