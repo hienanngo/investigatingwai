@@ -383,9 +383,17 @@ with tabs[4]:
 
     # ✅ Safely select available columns
     available_features = [col for col in numerical_features + categorical_features if col in merged.columns]
-    cluster_df = merged[available_features].dropna()
 
-    cluster_df_encoded = pd.get_dummies(cluster_df, columns=[col for col in categorical_features if col in cluster_df.columns], drop_first=True)
+    # Drop rows with too many missing values (allowing up to 30% NaNs)
+    row_thresh = int(0.7 * len(available_features))
+    cluster_df = merged[available_features].dropna(thresh=row_thresh)
+
+    # Encode categoricals and clean
+    cluster_df_encoded = pd.get_dummies(
+        cluster_df,
+        columns=[col for col in categorical_features if col in cluster_df.columns],
+        drop_first=True
+    )
     cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
 
     # ✅ Define consistent race labels as used in both grad rate and disparity columns
