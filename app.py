@@ -398,13 +398,16 @@ with tabs[4]:
 
     # ✅ Define consistent race labels as used in both grad rate and disparity columns
     race_order = [
-        ("Asian", "Pacific Islander"),
-        ("White, non-Hispanic", "Two or more"),
-        ("Black, non-Hispanic", "Hispanic"),
+        ("Asian", "Asian"),
+        ("Pacific Islander", "Pacific Islander"),
+        ("White, non-Hispanic", "White"),
+        ("Two or more", "Two or more"),
+        ("Black", "Black"),
+        ("Black, non-Hispanic", "Black"),
+        ("Hispanic", "Hispanic"),
         ("American Indian or Alaska Native", "Native American"),
-        ("Hispanic", "Black"),
-        ("two or more races", "White"),
-        ("Native Hawaiian or Other Pacific Islander", "Asian")
+        ("Native Hawaiian or Other Pacific Islander", "Pacific Islander"),
+        ("two or more races", "Two or more")
     ]
 
     # ✅ Dynamically collect columns that exist in the dataframe
@@ -413,13 +416,32 @@ with tabs[4]:
 
     # Handle alternative naming of graduation rate columns
     grad_rate_column_options = {
-        "Asian": ["Graduation rate, Asian", "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"],
-        "Black": ["Graduation rate, Black, non-Hispanic", "Graduation rate, Black"],
-        "Hispanic": ["Graduation rate, Hispanic", "Graduation rate, Hispanic or Latino"],
-        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
-        "Two or more": ["Graduation rate, two or more races"],
-        "Native American": ["Graduation rate, American Indian or Alaska Native"],
-        "Pacific Islander": ["Graduation rate, Native Hawaiian or Other Pacific Islander"]
+        "Asian": [
+            "Graduation rate, Asian",
+            "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"
+        ],
+        "Black": [
+            "Graduation rate, Black",
+            "Graduation rate, Black, non-Hispanic"
+        ],
+        "Hispanic": [
+            "Graduation rate, Hispanic",
+            "Graduation rate, Hispanic or Latino"
+        ],
+        "White": [
+            "Graduation rate, White",
+            "Graduation rate, White, non-Hispanic"
+        ],
+        "Two or more": [
+            "Graduation rate, two or more races",
+            "Graduation rate, Two or more"
+        ],
+        "Native American": [
+            "Graduation rate, American Indian or Alaska Native"
+        ],
+        "Pacific Islander": [
+            "Graduation rate, Native Hawaiian or Other Pacific Islander"
+        ]
     }
 
     for grad_label, disparity_key in race_order:
