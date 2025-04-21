@@ -315,28 +315,25 @@ with tabs[3]:
 
     disparity_column = f"{selected_race}_disparity"
 
-    # Define grad rate column safely
-    if selected_race == "Asian":
-        grad_rate_column = "Graduation rate, Asian"
-    elif selected_race == "Black":
-        grad_rate_column = "Graduation rate, Black, non-Hispanic"
-    elif selected_race == "Hispanic":
-        grad_rate_column = "Graduation rate, Hispanic"
-    elif selected_race == "White":
-        grad_rate_column = "Graduation rate, White, non-Hispanic"
-    elif selected_race == "Two or more":
-        grad_rate_column = "Graduation rate, two or more races"
-    elif selected_race == "Native American":
-        grad_rate_column = "Graduation rate, American Indian or Alaska Native"
-    elif selected_race == "Pacific Islander":
-        grad_rate_column = "Graduation rate, Native Hawaiian or Other Pacific Islander"
-    else:
-        st.error(f"❌ Unsupported race selection: '{selected_race}'")
-        st.stop()
+    # Gracefully handle graduation rate column naming inconsistencies
+    grad_rate_column_options = {
+        "Asian": ["Graduation rate, Asian", "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"],
+        "Black": ["Graduation rate, Black, non-Hispanic", "Graduation rate, Black"],
+        "Hispanic": ["Graduation rate, Hispanic", "Graduation rate, Hispanic or Latino"],
+        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
+        "Two or more": ["Graduation rate, two or more races"],
+        "Native American": ["Graduation rate, American Indian or Alaska Native"],
+        "Pacific Islander": ["Graduation rate, Native Hawaiian or Other Pacific Islander"]
+    }
 
-    # Ensure column exists in data before proceeding
-    if grad_rate_column not in merged.columns:
-        st.error(f"❌ Graduation rate column not found: '{grad_rate_column}'")
+    grad_rate_column = None
+    for col in grad_rate_column_options.get(selected_race, []):
+        if col in merged.columns:
+            grad_rate_column = col
+            break
+
+    if grad_rate_column is None:
+        st.error(f"❌ Graduation rate column not found for: '{selected_race}'")
         st.stop()
 
     # Independent variable
@@ -365,6 +362,7 @@ with tabs[3]:
     plt.ylabel(f"Graduation Rate ({selected_race})")
     plt.legend()
     st.pyplot(plt)
+
 
 
 # --- 📊 Interactive Correlation Matrix --- 
