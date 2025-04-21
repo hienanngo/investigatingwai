@@ -18,7 +18,6 @@ from sklearn.cluster import KMeans
 import umap.umap_ as umap
 import plotly.figure_factory as ff
 import scipy.stats as ss
-from scipy.stats import chi2_contingency
 
 # --- Constants ---
 CATEGORICAL_FEATURES = [
@@ -433,7 +432,7 @@ with tabs[4]:
         z=pearson_corr_matrix.values.round(2),
         x=list(pearson_corr_matrix.columns),
         y=list(pearson_corr_matrix.index),
-        colorscale='YlGnBu',
+        colorscale='PiYG',
         showscale=True,
         colorbar_title="Pearson Correlation"
     )
