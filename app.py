@@ -302,7 +302,7 @@ with tabs[3]:
     st.dataframe(vif_df)
 
     st.write("### 🧮 Linear Regression Results")
-    # --- Calculate Disparities ---
+# --- Calculate Disparities ---
     merged["faculty_total"] = merged["Grand total"]
     for race in FACULTY_RACE_COLS:
         merged[f"{race}_faculty_pct"] = (merged[FACULTY_RACE_COLS[race]] / merged["faculty_total"]) * 100
@@ -314,41 +314,46 @@ with tabs[3]:
     # Using selected race for disparity and graduation rate
 
     disparity_column = f"{selected_race}_disparity"
-      # Adjust according to your dataset
-    
-    if selected_race == "Asian":
-        grad_rate_column = "Graduation rate, Asian"
-    elif selected_race == "Black":
-        grad_rate_column = "Graduation rate, Black, non-Hispanic"
-    elif selected_race == "Hispanic":
-        grad_rate_column = "Graduation rate, Hispanic"
-    elif selected_race == "White":
-        grad_rate_column = "Graduation rate, White, non-Hispanic"
-    elif selected_race == "Two or more":
-        grad_rate_column = "Graduation rate, two or more races"
-    elif selected_race == "Native American":
-        grad_rate_column = "Graduation rate, American Indian or Alaska Native"
-    elif selected_race == "Pacific Islander":
-        grad_rate_column = "Graduation rate, Native Hawaiian or Other Pacific Islander"
 
-    # Ensure X and y have the same index by aligning them
-    X = merged[[disparity_column]].dropna()  # Independent variable (disparity)
-    y = merged[grad_rate_column].dropna()  # Dependent variable (graduation rate)
+    # Gracefully handle graduation rate column naming inconsistencies
+    grad_rate_column_options = {
+        "Asian": ["Graduation rate, Asian", "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"],
+        "Black": ["Graduation rate, Black, non-Hispanic", "Graduation rate, Black"],
+        "Hispanic": ["Graduation rate, Hispanic", "Graduation rate, Hispanic or Latino"],
+        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
+        "Two or more": ["Graduation rate, two or more races"],
+        "Native American": ["Graduation rate, American Indian or Alaska Native"],
+        "Pacific Islander": ["Graduation rate, Native Hawaiian or Other Pacific Islander"]
+    }
 
-    # Align indices to avoid the mismatch error
+    grad_rate_column = None
+    for col in grad_rate_column_options.get(selected_race, []):
+        if col in merged.columns:
+            grad_rate_column = col
+            break
+
+    if grad_rate_column is None:
+        st.error(f"❌ Graduation rate column not found for: '{selected_race}'")
+        st.stop()
+
+    # Independent variable
+    X = merged[[disparity_column]].dropna()
+    y = merged[grad_rate_column].dropna()
+
+    # Align indices
     X, y = X.align(y, join='inner', axis=0)
 
-    # Adding a constant to the model (intercept)
+    # Add intercept
     X = sm.add_constant(X)
 
-    # Fit the regression model
+    # Fit model
     model = sm.OLS(y, X).fit()
 
-    # Show model summary in Streamlit
+    # Display regression results
     st.subheader(f"📈 Regression Model: Disparity vs. Graduation Rate ({selected_race})")
     st.write(model.summary())
 
-    # --- Plotting Regression Line ---
+    # Plot
     plt.figure(figsize=(10, 6))
     plt.scatter(X[disparity_column], y, label="Data", color="blue", alpha=0.5)
     plt.plot(X[disparity_column], model.predict(X), label="Fitted Line", color="red", linewidth=2)
@@ -357,6 +362,8 @@ with tabs[3]:
     plt.ylabel(f"Graduation Rate ({selected_race})")
     plt.legend()
     st.pyplot(plt)
+
+
 
 # --- 📊 Interactive Correlation Matrix --- 
 with tabs[4]:
