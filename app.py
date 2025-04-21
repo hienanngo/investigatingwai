@@ -301,7 +301,6 @@ with tabs[3]:
 
     st.dataframe(vif_df)
 
-
     st.write("### 🧮 Linear Regression Results")
     # --- Calculate Disparities ---
     merged["faculty_total"] = merged["Grand total"]
@@ -313,8 +312,24 @@ with tabs[3]:
     # --- Regression Model ---
 
     # Using selected race for disparity and graduation rate
+
     disparity_column = f"{selected_race}_disparity"
-    grad_rate_column = f"Graduation rate, {selected_race}"  # Adjust according to your dataset
+      # Adjust according to your dataset
+    
+    if selected_race == "Asian":
+        grad_rate_column = "Graduation rate, Asian"
+    elif selected_race == "Black":
+        grad_rate_column = "Graduation rate, Black, non-Hispanic"
+    elif selected_race == "Hispanic":
+        grad_rate_column = "Graduation rate, Hispanic"
+    elif selected_race == "White":
+        grad_rate_column = "Graduation rate, White, non-Hispanic"
+    elif selected_race == "Two or more":
+        grad_rate_column = "Graduation rate, two or more races"
+    elif selected_race == "Native American":
+        grad_rate_column = "Graduation rate, American Indian or Alaska Native"
+    elif selected_race == "Pacific Islander":
+        grad_rate_column = "Graduation rate, Native Hawaiian or Other Pacific Islander"
 
     # Ensure X and y have the same index by aligning them
     X = merged[[disparity_column]].dropna()  # Independent variable (disparity)
