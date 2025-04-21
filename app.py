@@ -302,7 +302,7 @@ with tabs[3]:
     st.dataframe(vif_df)
 
     st.write("### 🧮 Linear Regression Results")
-    # --- Calculate Disparities ---
+# --- Calculate Disparities ---
     merged["faculty_total"] = merged["Grand total"]
     for race in FACULTY_RACE_COLS:
         merged[f"{race}_faculty_pct"] = (merged[FACULTY_RACE_COLS[race]] / merged["faculty_total"]) * 100
@@ -314,8 +314,8 @@ with tabs[3]:
     # Using selected race for disparity and graduation rate
 
     disparity_column = f"{selected_race}_disparity"
-      # Adjust according to your dataset
-    
+
+    # Define grad rate column safely
     if selected_race == "Asian":
         grad_rate_column = "Graduation rate, Asian"
     elif selected_race == "Black":
@@ -330,25 +330,33 @@ with tabs[3]:
         grad_rate_column = "Graduation rate, American Indian or Alaska Native"
     elif selected_race == "Pacific Islander":
         grad_rate_column = "Graduation rate, Native Hawaiian or Other Pacific Islander"
+    else:
+        st.error(f"❌ Unsupported race selection: '{selected_race}'")
+        st.stop()
 
-    # Ensure X and y have the same index by aligning them
-    X = merged[[disparity_column]].dropna()  # Independent variable (disparity)
-    y = merged[grad_rate_column].dropna()  # Dependent variable (graduation rate)
+    # Ensure column exists in data before proceeding
+    if grad_rate_column not in merged.columns:
+        st.error(f"❌ Graduation rate column not found: '{grad_rate_column}'")
+        st.stop()
 
-    # Align indices to avoid the mismatch error
+    # Independent variable
+    X = merged[[disparity_column]].dropna()
+    y = merged[grad_rate_column].dropna()
+
+    # Align indices
     X, y = X.align(y, join='inner', axis=0)
 
-    # Adding a constant to the model (intercept)
+    # Add intercept
     X = sm.add_constant(X)
 
-    # Fit the regression model
+    # Fit model
     model = sm.OLS(y, X).fit()
 
-    # Show model summary in Streamlit
+    # Display regression results
     st.subheader(f"📈 Regression Model: Disparity vs. Graduation Rate ({selected_race})")
     st.write(model.summary())
 
-    # --- Plotting Regression Line ---
+    # Plot
     plt.figure(figsize=(10, 6))
     plt.scatter(X[disparity_column], y, label="Data", color="blue", alpha=0.5)
     plt.plot(X[disparity_column], model.predict(X), label="Fitted Line", color="red", linewidth=2)
@@ -357,6 +365,7 @@ with tabs[3]:
     plt.ylabel(f"Graduation Rate ({selected_race})")
     plt.legend()
     st.pyplot(plt)
+
 
 # --- 📊 Interactive Correlation Matrix --- 
 with tabs[4]:
