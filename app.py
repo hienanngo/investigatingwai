@@ -449,14 +449,23 @@ with tabs[4]:
     st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
     st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
 
+    z_vals = pearson_corr_matrix.values.round(2)
+    font_colors = [['black' if abs(val) < 0.5 else 'white' for val in row] for row in z_vals]
+
     fig_pearson = ff.create_annotated_heatmap(
         z=pearson_corr_matrix.values.round(2),
         x=list(pearson_corr_matrix.columns),
         y=list(pearson_corr_matrix.index),
         colorscale='PiYG',
         showscale=True,
-        colorbar_title="Pearson Correlation"
+        colorbar_title="Pearson Correlation",
     )
+    for i, ann in enumerate(fig_pearson.layout.annotations):
+        val = float(ann.text)
+        if abs(val) < 0.5:
+            ann.font.color = 'black'
+        else:
+            ann.font.color = 'white'
     fig_pearson.update_layout(
         title="Pearson Correlation Matrix (Numeric Features)",
         xaxis_title="Numeric Features",
