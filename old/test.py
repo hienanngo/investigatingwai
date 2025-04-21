@@ -347,6 +347,11 @@ corr_features = [
     "Graduation rate, total cohort",
 ]
 
+# One-hot encode Public/Private
+public_private_dummies = pd.get_dummies(filtered_df["Public/Private"], prefix="Control", drop_first=True)
+corr_df = pd.concat([filtered_df[[disparity_var] + corr_features], public_private_dummies], axis=1)
+
+
 # --- Make sure the data is clean ---
 corr_df = filtered_df[[disparity_var] + corr_features].copy()
 corr_df = corr_df.dropna()
@@ -364,7 +369,7 @@ st.pyplot(fig)
 
 # --- Optional: Run simple linear regression ---
 with st.expander("🧮 Show linear regression summary"):
-    X = corr_df[corr_features]
+    X = corr_df.drop(columns=[disparity_var])
     y = corr_df[disparity_var]
     X = sm.add_constant(X)
     model = sm.OLS(y, X).fit()

@@ -1,9 +1,18 @@
 # data_loader.py
 import pandas as pd
 
+# --- Google Sheets Loader ---
 def load_data_from_gsheet(sheet_id):
     url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/gviz/tq?tqx=out:csv"
-    return pd.read_csv(url)
+    df = pd.read_csv(url)
+    df.columns = df.columns.str.strip()  # ← this is the key line to normalize column names
+    return df
+
+
+# --- Google Sheet IDs ---
+STAFF_SHEET_ID = "11TNLxFQSxA7W2bFZIRUSm2t-fDEU6Pz0vA-XEJ6PHbo"
+STUDENT_SHEET_ID = "1DI2E5Z9APCrPUd4BXPTgQL-cTP1P6eJb5ASYV7Y4raQ"
+
 
 def merge_and_clean(student_df, staff_df):
     staff_df = staff_df[
