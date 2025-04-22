@@ -78,7 +78,7 @@ filtered_df = get_filtered_df(merged, selected_state, selected_control, selected
 
 # --- Tabs ---
 tabs = st.tabs(["📋 Overview", "🧠 PCA & UMAP", "🎯 Disparity Clusters", "📈 Regression", "📊 Correlation Matrix"])
-
+st.text("© 2025, CHOE FAN MARQUESES NGO ")
 # === 📋 Overview ===
 with tabs[0]:
     st.subheader("📋 Filtered Institutions with Racial Disparities")
