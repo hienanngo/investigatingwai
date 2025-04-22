@@ -173,6 +173,38 @@ with tabs[0]:
     This helps ensure that disparities are analyzed as **results**, not drivers of clustering.
     """)
 
+    st.markdown("""
+    ### Data Source and Description
+
+    Our data are compiled from the **Integrated Postsecondary Education Data System (IPEDS)**, which includes institution-level information on:
+
+    - Faculty and student racial demographics  
+    - Institution type  
+    - Geographic region  
+    - Selectivity  
+    - Enrollment size  
+    - And more
+
+    This dataset allows us to **compare racial representation between students and faculty at a granular level**.
+
+    Specifically, we calculate a **racial disparity score** by subtracting the **percentage of faculty** from the **percentage of students** for each racial group.
+
+    - The dataset encompasses data for the year **2023** only.  
+    - Data was last downloaded on **March 11, 2025**.
+                    
+    ### Outlining Our Analyses
+
+    1. **Quantify the racial disparity** for each institution and racial group.
+    2. Apply **dimensionality reduction techniques** (PCA and UMAP) to explore the structure of the data and identify clustering patterns.
+    3. **Color these plots** by racial disparity scores to highlight trends.
+    4. Run **linear regressions** to investigate how institutional characteristics (e.g., endowment, region, sector) relate to levels of disparity.
+    5. Conduct additional analyses using tools such as:
+    - **Interactive Correlation Matrix of Disparities vs. Graduation Rates**
+    - **Pearson Correlation Matrix**
+    - **Cramér's V Correlation Matrix**
+
+                """)
+
 
 # === 🧠 PCA & UMAP ===
 with tabs[1]:
@@ -229,10 +261,52 @@ with tabs[1]:
     pca_data["Cluster"] = cluster_labels
 
     st.markdown("""
-    #### 🔎 PCA Explained
-    - PCA projects data onto axes that explain the most variance.
-    - UMAP preserves more local structure and neighborhood proximity.
-    - Clustering (KMeans) groups institutions with similar profiles.
+    #### Explaining PCA/UMAP Analysis
+
+    Principal Component Analysis (PCA) and Uniform Manifold Approximation and Projection (UMAP) are two dimensionality reduction techniques we employ to visualize the structure of our high-dimensional dataset.
+
+    **PCA** projects the data into a lower-dimensional space by finding directions (principal components) that maximize variance. It helps identify dominant patterns and linear correlations among variables.
+
+    **UMAP**, on the other hand, is a nonlinear technique that preserves local and global structure, making it especially powerful for discovering clusters or manifolds in complex data.
+
+    By reducing the number of dimensions, we can visualize how institutions with similar characteristics cluster and observe where racial disparities may be concentrated.
+
+    #### PCA Analysis:
+
+    PCA reduces complex institutional data into two main components that explain how colleges differ:
+
+    - **PC1** is driven by tuition, financial aid amounts, graduation rate, and faculty salaries. These reflect institutional wealth, selectivity, and resources—factors that often separate elite private schools from public or less-funded institutions.
+
+    - **PC2** is also influenced by financial aid variables, but in a different direction—it distinguishes schools based on how much aid students receive relative to costs and faculty pay, highlighting affordability and support.
+
+    When plotted, we see elite universities cluster in the lower right—they have high tuition, strong graduation rates, and well-paid faculty, but relatively neutral disparity scores for URM, meaning the percent of faculty match that of students. 
+
+    In contrast, large public colleges cluster lower, often with higher negative disparities among Black and Hispanic faculty. This means that in public colleges, there are larger percentages of Black and Hispanic students than percentages of faculty, meaning students at those schools see fewer professors of their same racial background.
+
+    This matters because PCA shows that racial disparities align with structural characteristics, not random chance. By identifying which dimensions drive differences between institutions, PCA helps us see where representation gaps are most concentrated—and why.
+
+    #### PCA Plot Insights: Racial Disparity Patterns
+
+    In the PCA plot, we color each point (institution) by its racial disparity score. This visualization reveals that disparities are not randomly distributed. For instance, institutions with higher disparities for certain races tend to cluster along certain principal components, suggesting shared characteristics such as institutional size, selectivity, or public/private status. For example, some elite private universities appear to exhibit smaller disparities for URM, while many large public institutions show a greater gap—possibly reflecting different hiring practices, tenure structures, or geographic constraints.
+
+    **Black Faculty Disparity**
+    High negative disparities cluster among large, less-selective public universities—especially in the lower-left of the PCA plot—highlighting a structural lack of Black faculty representation relative to student populations.
+
+    **Hispanic Faculty Disparity**
+    Disparities are concentrated in institutions with high Hispanic student populations but little matching faculty representation. These often appear in the central/top-left PCA region, suggesting insufficient faculty hiring despite strong demand.
+
+    **Asian Faculty Disparity**
+    Some elite institutions (upper-right quadrant) show mild overrepresentation of Asian faculty. These are often well-resourced, private, or STEM-focused colleges, where Asian faculty are more concentrated by field.
+
+    **White Faculty Disparity**
+    White faculty are consistently overrepresented across most institutions. However, elite universities (upper-right) show less of this overrepresentation, indicating relatively more balanced racial ratios in faculty hiring.
+
+    **Native American Faculty Disparity**
+    Disparities are widespread and not clearly clustered, suggesting a universal underrepresentation issue across all institution types.
+
+    **Pacific Islander Faculty Disparity**
+    Disparities for Pacific Islander faculty are also widespread but particularly pronounced at institutions with significant Pacific Islander student enrollment—often in western states or Hawaii. These institutions do not show corresponding faculty representation, indicating systemic hiring gaps and underinvestment in faculty pipeline development for this group.
+
     """)
 
     st.write("##### 🔢 Variance Explained")
@@ -429,6 +503,20 @@ with tabs[3]:
     plt.legend()
     st.pyplot(plt)
 
+    st.markdown("""
+        #### Regression Analysis: Understanding Drivers of Faculty-Student Racial Disparity
+
+        To provide further insight into the drivers of faculty-student racial disparity, we used a regression analysis and found that:
+
+        - **Faculty salary** is consistently associated with lower disparity across several racial groups—suggesting that better-paid institutions tend to have more representative faculties.
+        - **Graduation rate** and **endowment per student** also correlate with lower disparities, particularly for **Black** and **Hispanic** faculty.
+        - **Enrollment size** and **public status** often predict higher disparity, especially for underrepresented groups.
+
+        These results reinforce that **resources** and **institutional status** are closely tied to faculty-student racial representation.
+
+        These findings suggest that **systemic and structural factors**—not merely pipeline issues—contribute to faculty diversity shortfalls.
+    """)
+
 # --- 📊 Interactive Correlation Matrix ---
 with tabs[4]:
     st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
@@ -574,7 +662,34 @@ with tabs[4]:
 
 
 
-    st.text("The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")
+    st.markdown("""
+        #### Correlation Matrix Analysis
+
+        To better understand the relationships between key institutional variables and racial disparity scores, we constructed correlation matrices using both the raw and normalized variables in our dataset. These matrices allow us to quickly identify linear associations and highlight which factors may move together across U.S. colleges.
+
+        ##### Graduation Rates vs. Disparities
+
+        - **Strongest positive correlations**:  
+        In institutions where Black faculty are more overrepresented relative to Black students (i.e., positive disparity), graduation rates for other racial groups tend to be higher.  
+        This might suggest:
+            - Institutions making efforts to diversify faculty (especially Black representation) may foster better academic environments across the board.
+            - The presence of more diverse faculty could have broader institutional effects beyond just one group.
+
+        - **Mild negative correlations**:  
+        As Asian faculty are more overrepresented compared to Asian students, some underrepresented groups’ graduation rates may slightly decline.  
+        This could point to:
+            - Imbalances in faculty representation that favor one group disproportionately might correlate with lower engagement/support for others.
+            - Caution is warranted here—it doesn't imply causation but invites deeper institutional analysis.
+
+        - **Low/Neutral Relationships**:  
+        Cross-group effects (e.g., Hispanic disparity influencing White graduation rates) seem minimal compared to within-group or Black faculty influence.  
+        Disparities for groups like White, Pacific Islander, and Two or More Races tend to show weaker correlations across graduation rates (values near zero).
+
+        ---
+
+        These relationships are not consistently directional, so they may not carry strong predictive value in isolation.
+
+    """)
 
     def cramers_v(cat1, cat2):
         confusion_matrix = pd.crosstab(cat1, cat2)
@@ -624,6 +739,51 @@ with tabs[4]:
     )
     st.plotly_chart(fig_pearson, use_container_width=True, key="fig_corr_pearson")
 
+    st.markdown("""
+        #### Pearson Correlation Matrix
+
+        This matrix measures how different features correlate. A negative correlation between a group's graduation rate and its disparity score suggests that higher graduation rates do not benefit all groups equally:
+
+        ##### White Students
+        - **Correlation with White_dispar**:  
+        - Graduation rate (White) vs. White_dispar: **-0.49**
+        - **Interpretation**:  
+        Even though White students have high graduation rates, the negative correlation with White_dispar suggests gaps may still exist in representation or inclusion among subgroups.
+
+        ##### Asian Students
+        - Graduation rate (Asian) vs. Asian_dispar: **-0.22**  
+        - Graduation rate (total cohort) vs. Asian_dispar: **-0.18**
+        - **Interpretation**:  
+        Despite higher average graduation rates, Asian students face moderate disparity, indicating underlying issues in equity or support systems.
+
+        ##### Black Students
+        - Black_dispar vs:  
+        - Graduation rate (Black): **0.55**  
+        - Total enrollment: **0.30**
+        - **Interpretation**:  
+        There's a positive correlation, meaning as graduation rates rise, disparities actually shrink, which is a promising sign — but the disparity still exists.
+
+        ##### Hispanic Students
+        - Hispanic_dispar vs. graduation rates: Correlations are low (**0.02 to 0.10**)
+        - **Interpretation**:  
+        There's low correlation with graduation rates, suggesting Hispanic students may face challenges unrelated to academic performance — e.g., access, financial aid, or institutional support.
+
+        ##### Native American, Pacific Islander, and Multiracial (Two or More) Students
+        - Correlations with their respective disparities are mostly near zero or weakly positive/negative (**-0.05 to 0.15**)
+        - **Interpretation**:  
+        These groups may not show strong patterns in the data — but this could also be due to underrepresentation or small sample sizes in institutions.
+
+        ---
+
+        #### Big Picture Implications
+
+        High graduation rates don’t equate to equity.  
+        - White and Asian groups, while graduating in high numbers, still show significant disparities.  
+        - Black students show positive progress, as rising graduation rates seem to help close disparity gaps — a potential model for equity practices.  
+        - Systemic barriers may still exist for groups like Hispanic, Native American, and Pacific Islander students — especially in areas beyond graduation statistics.
+
+                """)
+
     st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
     if not cramers_v_corr_matrix.empty:
         st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
@@ -647,3 +807,49 @@ with tabs[4]:
         st.plotly_chart(fig_cramers_v, use_container_width=True, key="fig_corr_cramers")
     else:
         st.warning("⚠️ Not enough categorical data available to compute Cramér's V correlation matrix.")
+
+    st.markdown("""
+        #### What is Cramér’s V?
+
+        Cramér’s V measures the strength of association between two categorical variables, ranging from 0 (no association) to 1 (perfect association). Unlike Pearson's correlation (which is suited for numeric data), this metric is ideal for categorical features like institutional type, locale, etc.
+
+        - **Public/Private vs. Institutional Category** — **Cramér’s V = 0.41**  
+        *Moderate association*: Institutional category (e.g., Baccalaureate vs. Research University) and control status (Public vs. Private) are moderately associated — suggesting that certain types of colleges are more likely to be public or private.
+
+        - **Public/Private vs. Urban-centric Locale** — **Cramér’s V = 0.27**  
+        *Weak-to-moderate association*: Public/private status has some relation to the institution's geographic setting. Urban campuses may slightly skew private; rural ones may lean public (or vice versa).
+
+        ---
+
+        #### Key Correlations Observed
+
+        ##### A. Racial Disparity Correlations
+
+        - **Positive correlation between disparities of underrepresented minorities (URMs):**  
+        Institutions with high Black faculty-student disparity also tend to exhibit low disparities for Hispanic and Native American populations.  
+        → This suggests shared structural barriers affecting multiple groups simultaneously.
+
+        - **Negative correlations between White disparity and URM disparities:**  
+        As URM representation increases, the share of White faculty may relatively decline.  
+        → This highlights a zero-sum dynamic under current hiring practices.
+
+        ---
+
+        #### Interpreting Limitations
+
+        > **Correlation ≠ Causation**
+
+        - Some associations may be driven by latent variables not directly captured in the dataset (e.g., local labor markets, historical hiring practices, state policy environments).
+        - Certain variables may be collinear — for example, *enrollment size* and *public/private status*.  
+        - To address this, we computed **Variance Inflation Factors (VIF)** to detect and control for **multicollinearity**, ensuring our regression results are more reliable and not distorted by overlapping predictors.
+
+        ---
+
+        #### Correlation Matrix Takeaways
+
+        - The correlation matrices reinforce our key findings:  
+        Faculty-student racial disparities are deeply intertwined with **institutional structure**, **region**, and **resources**.
+        - These patterns suggest that addressing underrepresentation must occur across **multiple axes simultaneously**, given the strong co-movement of disparities across racial groups.
+        - While correlation matrices are **not explanatory on their own**, they provide an essential map for understanding **which institutional factors merit deeper causal investigation**.
+
+                """)
