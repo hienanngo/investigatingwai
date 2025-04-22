@@ -367,6 +367,9 @@ with tabs[3]:
 
 # --- 📊 Interactive Correlation Matrix --- 
 with tabs[4]:
+    st.write("📋 Columns in merged data:")
+    st.write(merged.columns.tolist())
+
     st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
     categorical_features = [
         "Public/Private",
@@ -456,14 +459,19 @@ with tabs[4]:
         if grad_col:
             grad_rate_columns.append(grad_col)
         else:
-            print(f"⚠️ Missing graduation column: {grad_label}")
+            st.warning(f"Graduation rate data is missing for the {grad_label} group.")
 
         if disparity_col in cluster_df_encoded.columns:
             disparity_columns.append(disparity_col)
         else:
             print(f"⚠️ Missing disparity column: {disparity_col}")
 
+    if len(grad_rate_columns) == 0 or len(disparity_columns) == 0:
+        st.error("❌ Missing graduation or disparity columns needed for correlation matrix.")
+        st.stop()
 
+    st.write("✅ Found disparity columns:", disparity_columns)
+    st.write("✅ Found graduation columns:", grad_rate_columns)
 
     # ✅ Select relevant numeric data
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
