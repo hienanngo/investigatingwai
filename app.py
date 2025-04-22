@@ -365,103 +365,113 @@ with tabs[3]:
 
 
 
-# --- 📊 Interactive Correlation Matrix --- 
+# --- 📊 Interactive Correlation Matrix ---
 with tabs[4]:
     st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
-    categorical_features = [
-        "Public/Private",
-        "Degree of urbanization (Urban-centric locale)",
-        "Institutional category"
-    ]
 
+    # Define relevant numerical features (including all graduation rates and disparities)
     numerical_features = [
         "Total  enrollment",
         "Tuition and fees, 2023-24",
         "Percent admitted - total",
         "Graduation rate, total cohort"
-    ] + [col for col in GRAD_RATE_COLS if col in merged.columns] + [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
+    ]
+    # Add all graduation rate columns present (covering different naming conventions)
+    numerical_features += [col for col in GRAD_RATE_COLS if col in merged.columns]
+    # Ensure Black and White graduation rate columns are included if present (alternate naming)
+    if "Graduation rate, Black" in merged.columns and "Graduation rate, Black, non-Hispanic" not in merged.columns:
+        numerical_features.append("Graduation rate, Black")
+    if "Graduation rate, White" in merged.columns and "Graduation rate, White, non-Hispanic" not in merged.columns:
+        numerical_features.append("Graduation rate, White")
+    # Add all disparity columns present
+    numerical_features += [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
 
-    # ✅ Safely select available columns
-    available_features = [col for col in numerical_features + categorical_features if col in merged.columns]
+    # Include categorical features (for completeness in dataset, will be encoded later)
+    all_features = numerical_features + categorical_features
+    available_features = [col for col in all_features if col in merged.columns]
 
-    # Drop rows with too many missing values (allowing up to 30% NaNs)
+    # Drop rows with more than 30% missing values in these relevant columns
     row_thresh = int(0.7 * len(available_features))
-    cluster_df = merged[available_features].dropna(thresh=row_thresh)
+    corr_df = merged[available_features].dropna(thresh=row_thresh)
 
-    # Encode categoricals and clean
-    cluster_df_encoded = pd.get_dummies(
-        cluster_df,
-        columns=[col for col in categorical_features if col in cluster_df.columns],
+    # Encode categorical features and prepare data for correlation
+    corr_df_encoded = pd.get_dummies(
+        corr_df,
+        columns=[col for col in categorical_features if col in corr_df.columns],
         drop_first=True
     )
-    cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
+    corr_df_encoded = corr_df_encoded.replace([np.inf, -np.inf], np.nan)
+    # **Do not drop rows here**: allow pairwise correlation with remaining NaNs
 
-    # ✅ Define consistent race labels as used in both grad rate and disparity columns
-    race_order = [
-        ("Asian", "Asian"),
-        ("Pacific Islander", "Pacific Islander"),
-        ("White, non-Hispanic", "White"),
-        ("Two or more", "Two or more"),
-        ("Black", "Black"),
-        ("Black, non-Hispanic", "Black"),
-        ("Hispanic", "Hispanic"),
-        ("American Indian or Alaska Native", "Native American"),
-        ("Native Hawaiian or Other Pacific Islander", "Pacific Islander"),
-        ("two or more races", "Two or more")
-    ]
-
-    # ✅ Dynamically collect columns that exist in the dataframe
+    # Determine available disparity and graduation rate columns dynamically
     disparity_columns = []
     grad_rate_columns = []
-
-    # Handle alternative naming of graduation rate columns
-    grad_rate_column_options = {
-        "Asian": [
-            "Graduation rate, Asian",
-            "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"
-        ],
-        "Black": [
-            "Graduation rate, Black",
-            "Graduation rate, Black, non-Hispanic"
-        ],
-        "Hispanic": [
-            "Graduation rate, Hispanic",
-            "Graduation rate, Hispanic or Latino"
-        ],
-        "White": [
-            "Graduation rate, White",
-            "Graduation rate, White, non-Hispanic"
-        ],
-        "Two or more": [
-            "Graduation rate, two or more races",
-            "Graduation rate, Two or more"
-        ],
-        "Native American": [
-            "Graduation rate, American Indian or Alaska Native"
-        ],
-        "Pacific Islander": [
-            "Graduation rate, Native Hawaiian or Other Pacific Islander"
-        ]
-    }
-
-    for grad_label, disparity_key in race_order:
-        grad_col = None
-        for col_option in grad_rate_column_options.get(disparity_key, []):
-            if col_option in cluster_df.columns:  # Match against original cluster_df, not encoded
-                grad_col = col_option
-                break
-
-        disparity_col = f"{disparity_key}_disparity"
-
+    for race, options in grad_rate_column_options.items():
+        # Find the first matching graduation rate column for this race
+        grad_col = next((col for col in options if col in corr_df.columns), None)
+        disparity_col = f"{race}_disparity"
         if grad_col:
-            grad_rate_columns.append(grad_col)
+            if grad_col not in grad_rate_columns:
+                grad_rate_columns.append(grad_col)
         else:
-            print(f"⚠️ Missing graduation column: {grad_label}")
+            st.warning(f"Graduation rate data is missing for the {race} group.")
+        if disparity_col in corr_df.columns:
+            if disparity_col not in disparity_columns:
+                disparity_columns.append(disparity_col)
+        else:
+            st.warning(f"Disparity data is missing for the {race} group.")
 
-        if disparity_col in cluster_df.columns:
-            disparity_columns.append(disparity_col)
-        else:
-            print(f"⚠️ Missing disparity column: {disparity_col}")
+    # Proceed only if we have data for correlations
+    if corr_df.shape[0] < 2 or not grad_rate_columns or not disparity_columns:
+        st.warning("Not enough data available to compute the correlation matrix.")
+    else:
+        # Compute correlation matrix on the selected numeric columns
+        numeric_cols = corr_df_encoded[grad_rate_columns + disparity_columns].select_dtypes(include=[np.number])
+        corr_matrix = numeric_cols.corr()
+
+        # Extract the sub-matrix of interest: graduation rates vs disparities
+        try:
+            corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
+        except KeyError as e:
+            st.error(f"❌ Error selecting correlation sub-matrix: {e}")
+            st.stop()
+
+        # Round values for display
+        rounded_values = np.round(corr_matrix_selected.values, 2)
+        x_labels = list(corr_matrix_selected.columns)
+        y_labels = list(corr_matrix_selected.index)
+
+        # Create annotated heatmap
+        try:
+            fig_corr = ff.create_annotated_heatmap(
+                z=rounded_values,
+                x=x_labels,
+                y=y_labels,
+                colorscale="YlGnBu",
+                showscale=True,
+                colorbar_title="Correlation Coefficient",
+                annotation_text=[[f"{val:.2f}" for val in row] for row in rounded_values]
+            )
+            # Adjust text color for better contrast
+            for i, ann in enumerate(fig_corr.layout.annotations):
+                row = i // len(x_labels)
+                col = i % len(x_labels)
+                val = rounded_values[row][col]
+                ann.font.color = "black" if abs(val) < 0.25 else "white"
+            # Update layout and display chart
+            fig_corr.update_layout(
+                title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
+                xaxis_title="Faculty-Student Disparity",
+                yaxis_title="Graduation Rate",
+                width=800,
+                height=600,
+                template="plotly_dark"
+            )
+            st.plotly_chart(fig_corr, use_container_width=True)
+        except Exception as e:
+            st.error(f"❌ Error rendering correlation heatmap: {e}")
+
+    # (Optional) Add explanatory text or additional correlation analyses below if needed.
 
 
     # ✅ Select relevant numeric data
