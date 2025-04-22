@@ -363,12 +363,8 @@ with tabs[3]:
     plt.legend()
     st.pyplot(plt)
 
-
 # --- 📊 Interactive Correlation Matrix ---
 with tabs[4]:
-    st.write("📋 Columns in merged data:")
-    st.write(merged.columns.tolist())
-
     st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
 
     categorical_features = [
@@ -461,20 +457,13 @@ with tabs[4]:
 
         if grad_col:
             grad_rate_columns.append(grad_col)
-        else:
-            st.warning(f"Graduation rate data is missing for the {grad_label} group.")
 
         if disparity_col in corr_df_encoded.columns:
             disparity_columns.append(disparity_col)
-        else:
-            st.warning(f"Disparity data is missing for the {disparity_col} column.")
 
     if len(grad_rate_columns) == 0 or len(disparity_columns) == 0:
         st.error("❌ Missing graduation or disparity columns needed for correlation matrix.")
         st.stop()
-
-    st.write("✅ Found disparity columns:", disparity_columns)
-    st.write("✅ Found graduation columns:", grad_rate_columns)
 
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
     numeric_cols = corr_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
@@ -537,13 +526,7 @@ with tabs[4]:
                     cramers_v_matrix.loc[col1, col2] = 1.0
         return cramers_v_matrix
 
-    existing_categoricals = [col for col in categorical_features if col in corr_df.columns]
-    st.write("🕵️‍♂️ Categorical columns present for Cramér's V:", existing_categoricals)
-
-    cramers_v_corr_matrix = cramers_v_matrix(corr_df, existing_categoricals)
-    st.write("📀 Cramér's V matrix shape:", cramers_v_corr_matrix.shape)
-    st.write("🧪 Cramér's V matrix preview:")
-    st.dataframe(cramers_v_corr_matrix)
+    cramers_v_corr_matrix = cramers_v_matrix(corr_df, [col for col in categorical_features if col in corr_df.columns])
 
     numeric_df = corr_df_encoded[[col for col in numerical_features if col in corr_df_encoded.columns]].copy()
     pearson_corr_matrix = numeric_df.corr()
@@ -564,10 +547,7 @@ with tabs[4]:
     )
     for i, ann in enumerate(fig_pearson.layout.annotations):
         val = float(ann.text)
-        if abs(val) < 0.5:
-            ann.font.color = 'black'
-        else:
-            ann.font.color = 'white'
+        ann.font.color = 'black' if abs(val) < 0.5 else 'white'
     fig_pearson.update_layout(
         title="Pearson Correlation Matrix (Numeric Features)",
         xaxis_title="Numeric Features",
