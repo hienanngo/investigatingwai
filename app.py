@@ -364,13 +364,13 @@ with tabs[3]:
     st.pyplot(plt)
 
 
-
-# --- 📊 Interactive Correlation Matrix --- 
+# --- 📊 Interactive Correlation Matrix ---
 with tabs[4]:
     st.write("📋 Columns in merged data:")
     st.write(merged.columns.tolist())
 
     st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
+
     categorical_features = [
         "Public/Private",
         "Degree of urbanization (Urban-centric locale)",
@@ -382,38 +382,45 @@ with tabs[4]:
         "Tuition and fees, 2023-24",
         "Percent admitted - total",
         "Graduation rate, total cohort"
-    ] + [col for col in GRAD_RATE_COLS if col in merged.columns] + [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
+    ]
 
-    # ✅ Safely select available columns
-    available_features = [col for col in numerical_features + categorical_features if col in merged.columns]
+    numerical_features += [col for col in GRAD_RATE_COLS if col in merged.columns]
 
-    # Drop rows with too many missing values (allowing up to 30% NaNs)
+    if "Graduation rate, Black" in merged.columns and "Graduation rate, Black, non-Hispanic" not in merged.columns:
+        numerical_features.append("Graduation rate, Black")
+    if "Graduation rate, White" in merged.columns and "Graduation rate, White, non-Hispanic" not in merged.columns:
+        numerical_features.append("Graduation rate, White")
+
+    numerical_features += [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
+
+    all_features = numerical_features + categorical_features
+    available_features = [col for col in all_features if col in merged.columns]
+
     row_thresh = int(0.7 * len(available_features))
-    cluster_df = merged[available_features].dropna(thresh=row_thresh)
+    corr_df = merged[available_features].dropna(thresh=row_thresh)
 
-    # Encode categoricals and clean
-    cluster_df_encoded = pd.get_dummies(
-        cluster_df,
-        columns=[col for col in categorical_features if col in cluster_df.columns],
+    if corr_df.empty:
+        st.error("⚠️ Not enough data after threshold filtering. Please adjust missing data settings.")
+        st.stop()
+
+    corr_df_encoded = pd.get_dummies(
+        corr_df,
+        columns=[col for col in categorical_features if col in corr_df.columns],
         drop_first=True
     )
     cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
 
-    # ✅ Define consistent race labels as used in both grad rate and disparity columns
-    race_order = [
-        ("Asian", "Asian"),
-        ("Pacific Islander", "Pacific Islander"),
-        ("White, non-Hispanic", "White"),
-        ("Two or more", "Two or more"),
-        ("Black", "Black"),
-        ("Black, non-Hispanic", "Black"),
-        ("Hispanic", "Hispanic"),
-        ("American Indian or Alaska Native", "Native American"),
-        ("Native Hawaiian or Other Pacific Islander", "Pacific Islander"),
-        ("two or more races", "Two or more")
-    ]
+    # ✅ Define consistent race labels and fallback options
+    grad_rate_fallbacks = {
+        "Asian": ["Graduation rate, Asian", "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"],
+        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
+        "Black": ["Graduation rate, Black, non-Hispanic", "Graduation rate, Black"],
+        "Hispanic": ["Graduation rate, Hispanic", "Graduation rate, Hispanic or Latino"],
+        "Two or more": ["Graduation rate, two or more races"],
+        "Native American": ["Graduation rate, American Indian or Alaska Native"],
+        "Pacific Islander": ["Graduation rate, Native Hawaiian or Other Pacific Islander"]
+    }
 
-    # ✅ Dynamically collect columns that exist in the dataframe
     disparity_columns = []
     grad_rate_columns = []
 
@@ -459,23 +466,20 @@ with tabs[4]:
         if grad_col:
             grad_rate_columns.append(grad_col)
         else:
-            st.warning(f"Graduation rate data is missing for the {grad_label} group.")
+            print(f"⚠️ Missing graduation column: {grad_label}")
 
         if disparity_col in cluster_df_encoded.columns:
             disparity_columns.append(disparity_col)
         else:
             print(f"⚠️ Missing disparity column: {disparity_col}")
 
-    if len(grad_rate_columns) == 0 or len(disparity_columns) == 0:
-        st.error("❌ Missing graduation or disparity columns needed for correlation matrix.")
-        st.stop()
 
     st.write("✅ Found disparity columns:", disparity_columns)
     st.write("✅ Found graduation columns:", grad_rate_columns)
 
     # ✅ Select relevant numeric data
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
-    numeric_cols = cluster_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
+    numeric_cols = corr_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
 
     # ✅ Correlation matrix
     corr_matrix = numeric_cols.corr()
@@ -517,7 +521,7 @@ with tabs[4]:
             template="plotly_dark"
         )
 
-        st.plotly_chart(fig_corr, use_container_width=True)
+        st.plotly_chart(fig_corr, use_container_width=True, key="heatmap_disparity_grad_2")
 
     except Exception as e:
         st.error(f"❌ Error rendering correlation heatmap: {e}")
@@ -541,10 +545,10 @@ with tabs[4]:
                     cramers_v_matrix.loc[col1, col2] = 1.0
         return cramers_v_matrix
 
-    numeric_df = cluster_df_encoded[[col for col in numerical_features if col in cluster_df_encoded.columns]].copy()
+    numeric_df = corr_df_encoded[[col for col in numerical_features if col in corr_df_encoded.columns]].copy()
     pearson_corr_matrix = numeric_df.corr()
 
-    cramers_v_corr_matrix = cramers_v_matrix(cluster_df, [col for col in categorical_features if col in cluster_df.columns])
+    cramers_v_corr_matrix = cramers_v_matrix(corr_df_encoded, [col for col in categorical_features if col in corr_df_encoded.columns])
 
     st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
     st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
@@ -574,7 +578,7 @@ with tabs[4]:
         height=900,
         template="plotly_dark"
     )
-    st.plotly_chart(fig_pearson, use_container_width=True)
+    st.plotly_chart(fig_pearson, use_container_width=True, key="fig_corr_pearson")
 
     st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
     st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
