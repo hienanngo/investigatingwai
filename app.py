@@ -407,51 +407,33 @@ with tabs[4]:
     )
     cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
 
-    # ✅ Define consistent race labels as used in both grad rate and disparity columns
-    race_order = [
-        ("Asian", "Pacific Islander"),
-        ("White, non-Hispanic", "Two or more"),
-        ("Black, non-Hispanic", "Hispanic"),
-        ("American Indian or Alaska Native", "Native American"),
-        ("Hispanic", "Black"),
-        ("two or more races", "White"),
-        ("Native Hawaiian or Other Pacific Islander", "Asian")
-    ]
-
-    # ✅ Dynamically collect columns that exist in the dataframe
-    disparity_columns = []
-    grad_rate_columns = []
-
-    # Handle alternative naming of graduation rate columns
-    grad_rate_column_options = {
+    # ✅ Define consistent race labels and fallback options
+    grad_rate_fallbacks = {
         "Asian": ["Graduation rate, Asian", "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"],
+        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
         "Black": ["Graduation rate, Black, non-Hispanic", "Graduation rate, Black"],
         "Hispanic": ["Graduation rate, Hispanic", "Graduation rate, Hispanic or Latino"],
-        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
         "Two or more": ["Graduation rate, two or more races"],
         "Native American": ["Graduation rate, American Indian or Alaska Native"],
         "Pacific Islander": ["Graduation rate, Native Hawaiian or Other Pacific Islander"]
     }
 
-    for grad_label, disparity_key in race_order:
-        grad_col = None
-        for col_option in grad_rate_column_options.get(disparity_key, []):
-            if col_option in cluster_df_encoded.columns:
-                grad_col = col_option
-                break
+    disparity_columns = []
+    grad_rate_columns = []
 
-        disparity_col = f"{disparity_key}_disparity"
-
-        if grad_col:
-            grad_rate_columns.append(grad_col)
-        else:
-            print(f"⚠️ Missing graduation column: {grad_label}")
-
+    for race_key, fallback_list in grad_rate_fallbacks.items():
+        disparity_col = f"{race_key}_disparity"
         if disparity_col in cluster_df_encoded.columns:
             disparity_columns.append(disparity_col)
         else:
             print(f"⚠️ Missing disparity column: {disparity_col}")
 
+        for grad_col in fallback_list:
+            if grad_col in cluster_df_encoded.columns:
+                grad_rate_columns.append(grad_col)
+                break
+        else:
+            print(f"⚠️ Missing graduation column for {race_key}: tried {fallback_list}")
 
 
     # ✅ Select relevant numeric data
