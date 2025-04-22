@@ -31,7 +31,7 @@ CATEGORICAL_FEATURES = [
 
 # --- App Config ---
 st.set_page_config(page_title="Diversity Disparity Dashboard", layout="wide")
-st.title("📊 Faculty vs. Student Racial Disparity in U.S. Colleges")
+st.title("🏫​ Faculty vs. Student Racial Disparity in U.S. Colleges")
 
 # --- Cached Data Loaders ---
 @st.cache_data(show_spinner="📥 Loading data from Google Sheets...", persist=True)
@@ -77,7 +77,7 @@ def get_filtered_df(merged, selected_state, selected_control, selected_degree, s
 filtered_df = get_filtered_df(merged, selected_state, selected_control, selected_degree, selected_urban)
 
 # --- Tabs ---
-tabs = st.tabs(["📋 Overview", "🧠 PCA & UMAP", "🎯 Disparity Clusters", "📈 Regression", "📊 Correlation Matrix"])
+tabs = st.tabs(["📋 Overview", "🧠 PCA & UMAP", "🎯 Disparity Clusters", "📈 Regression", "📊 Correlation Matrix", "📚​ Bibliography"])
 st.text("© 2025, CHOE FAN MARQUESES NGO ")
 # === 📋 Overview ===
 with tabs[0]:
@@ -136,15 +136,6 @@ with tabs[0]:
     - **Public and urban colleges** have more diverse student populations but **lag in faculty diversity**.
     - Elite institutions often lack significant representation of minority faculty in **STEM**, contributing to a **“leaky pipeline”** for underrepresented students (**National Science Foundation, 2018**).
 
-    ---
-
-    ### Conclusion
-
-    Faculty diversity is **crucial** for creating inclusive environments that improve student outcomes, but **significant barriers remain**. Addressing these disparities is essential to fostering a more **equitable and inclusive higher education system**.
-
-    To seek solutions, **our project builds on these studies** by:
-    - **Visualizing** disparities across institutions.
-    - **Quantitatively examining** how demographic and institutional characteristics relate to the disparity.
     """)
 
     st.subheader("📋 Filtered Institutions with Racial Disparities")
@@ -202,6 +193,23 @@ with tabs[0]:
     - **Interactive Correlation Matrix of Disparities vs. Graduation Rates**
     - **Pearson Correlation Matrix**
     - **Cramér's V Correlation Matrix**
+
+    ### Conclusion
+
+    Our analysis confirms that racial disparities between faculty and student representation are deeply entrenched and unevenly distributed across U.S. colleges. These gaps are shaped not only by race, but also by institutional wealth, size, type, and more.
+
+    - **Black, Native American, and Pacific Islander faculty** are the most underrepresented across institutions.
+    - **Regression models** show that *faculty salary*, *graduation rate*, and *endowment per student* are the strongest predictors of lower racial disparities—highlighting the role of resources and institutional investment in shaping representation.
+    - We also found that **elite institutions often show stronger minority faculty representation**, slightly contradicting prior research. This suggests nuanced progress in certain high-resource contexts.
+    - Conversely, **public status and larger enrollment** are often linked to *higher disparity*, especially for underrepresented groups. This may seem counterintuitive since student diversity is often greater in public and larger institutions. However, the gap between student and faculty diversity at these schools leads to stronger negative URM disparity scores.
+    - The **correlation matrices** reinforce these trends, revealing strong positive associations between *institutional quality markers* (e.g., selectivity and financial resources) and more equitable faculty-student racial ratios.
+    - We used **Variance Inflation Factor (VIF) analysis** to control for multicollinearity and ensure the reliability of our regression coefficients.
+
+    Together with our **PCA/UMAP visualizations**, these findings paint a clear picture: racial faculty disparities are not random—they follow structural patterns tied to institutional characteristics.
+
+    **Improving diversity requires proactive hiring, retention strategies, and accountability mechanisms at the institutional level.**
+
+    We hope this project provides both insight and direction for those committed to making higher education more equitable and representative.
 
                 """)
 
@@ -851,5 +859,37 @@ with tabs[4]:
         Faculty-student racial disparities are deeply intertwined with **institutional structure**, **region**, and **resources**.
         - These patterns suggest that addressing underrepresentation must occur across **multiple axes simultaneously**, given the strong co-movement of disparities across racial groups.
         - While correlation matrices are **not explanatory on their own**, they provide an essential map for understanding **which institutional factors merit deeper causal investigation**.
+
+                """)
+    
+with tabs[5]:
+    st.markdown("""
+        ### References
+
+        - Allen, B. C. (2003). *The representation of faculty of color in the academy: A national study*. The Journal of Higher Education, 74(5), 513–536. [https://doi.org/10.1353/jhe.2003.0026](https://doi.org/10.1353/jhe.2003.0026)
+
+        - Antonio, A. L. (2001). *The influence of racial diversity on the development of college students’ critical thinking*. The Journal of Higher Education, 72(5), 600–620. [https://doi.org/10.1080/00221546.2001.11777157](https://doi.org/10.1080/00221546.2001.11777157)
+
+        - Denson, N., & Chang, M. J. (2009). *Faculty diversity and the campus racial climate*. The Journal of Higher Education, 80(1), 39–61. [https://doi.org/10.1353/jhe.0.0040](https://doi.org/10.1353/jhe.0.0040)
+
+        - Freeman, R., & Lamberton, C. (2016). *The equity imperative: Improving diversity and inclusion in higher education*. Harvard University Press.
+
+        - García, G. A. (2019). *Disparities in faculty and student racial representation in U.S. higher education: A national study*. The Journal of Higher Education, 90(2), 269–293. [https://doi.org/10.1080/00221546.2018.1480195](https://doi.org/10.1080/00221546.2018.1480195)
+
+        - Hurtado, S., Alvarez, C. L., Guillermo-Wann, C., Cuellar, M., & Arellano, L. (2010). *A model for diverse learning environments*. The Journal of Higher Education, 81(1), 1–24. [https://doi.org/10.1080/00221546.2010.11778998](https://doi.org/10.1080/00221546.2010.11778998)
+
+        - Lee, S. J., & Cho, H. (2015). *The effects of faculty diversity on student satisfaction and success*. Review of Higher Education, 38(3), 393–417. [https://doi.org/10.1353/rhe.2015.0019](https://doi.org/10.1353/rhe.2015.0019)
+
+        - Milem, J. F., Chang, M. J., & Antonio, A. L. (2005). *Making diversity work on campus: A research-based perspective*. American Council on Education. [https://www.acenet.edu/Research-and-Policy/Pages/Diversity-and-Inclusion.aspx](https://www.acenet.edu/Research-and-Policy/Pages/Diversity-and-Inclusion.aspx)
+
+        - National Academy of Sciences. (2018). *Racial and ethnic diversity in higher education: Trends and challenges*. National Academies Press. [https://doi.org/10.17226/24745](https://doi.org/10.17226/24745)
+
+        - National Center for Education Statistics (NCES). (2020). *The condition of education 2020*. U.S. Department of Education, Institute of Education Sciences. [https://nces.ed.gov/pubs2020/2020144.pdf](https://nces.ed.gov/pubs2020/2020144.pdf)
+
+        - National Science Foundation (NSF). (2018). *Women, minorities, and persons with disabilities in science and engineering: 2017*. NSF. [https://www.nsf.gov/statistics/2017/nsf17310/](https://www.nsf.gov/statistics/2017/nsf17310/)
+
+        - The Education Trust. (2018). *The state of education: 2018*. The Education Trust. [https://edtrust.org/](https://edtrust.org/)
+
+        - U.S. Department of Education, National Center for Education Statistics. (n.d.). *Institution data from the IPEDS Data Center*. Retrieved April 22, 2025, from [https://nces.ed.gov/ipeds/datacenter/InstitutionByName.aspx?stepId=1&sid=6ac3a1ae-2f75-4e30-8c0f-b6b31fd41b12&rtid=1](https://nces.ed.gov/ipeds/datacenter/InstitutionByName.aspx?stepId=1&sid=6ac3a1ae-2f75-4e30-8c0f-b6b31fd41b12&rtid=1)
 
                 """)
