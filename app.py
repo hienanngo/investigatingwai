@@ -575,9 +575,7 @@ with tabs[4]:
     )
     st.plotly_chart(fig_pearson, use_container_width=True, key="fig_corr_pearson")
 
-ite("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
-
-if not cramers_v_corr_matrix.empty:
+    st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
     st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
 
     fig_cramers_v = ff.create_annotated_heatmap(
@@ -596,13 +594,10 @@ if not cramers_v_corr_matrix.empty:
         height=600,
         template="plotly_dark"
     )
-    st.plotly_chart(fig_cramers_v, use_container_width=True, key="fig_corr_cramers")
-else:
-    st.warning("⚠️ Not enough categorical data available to compute Cramér's V correlation matrix.")
+    st.plotly_chart(fig_cramers_v, use_container_width=True)
 
-st.text("""
-The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
-The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
-You can hover over the cells to see the exact values for each correlation.
-""")
-    st.wr       
+    st.text("""
+    The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
+    The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
+    You can hover over the cells to see the exact values for each correlation.
+    """)
