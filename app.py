@@ -408,23 +408,21 @@ with tabs[4]:
         columns=[col for col in categorical_features if col in corr_df.columns],
         drop_first=True
     )
-    cluster_df_encoded = cluster_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
+    corr_df_encoded = corr_df_encoded.replace([np.inf, -np.inf], np.nan).dropna()
 
-    # ✅ Define consistent race labels and fallback options
-    grad_rate_fallbacks = {
-        "Asian": ["Graduation rate, Asian", "Graduation rate, Asian/Native Hawaiian/Other Pacific Islander"],
-        "White": ["Graduation rate, White, non-Hispanic", "Graduation rate, White"],
-        "Black": ["Graduation rate, Black, non-Hispanic", "Graduation rate, Black"],
-        "Hispanic": ["Graduation rate, Hispanic", "Graduation rate, Hispanic or Latino"],
-        "Two or more": ["Graduation rate, two or more races"],
-        "Native American": ["Graduation rate, American Indian or Alaska Native"],
-        "Pacific Islander": ["Graduation rate, Native Hawaiian or Other Pacific Islander"]
-    }
+    race_order = [
+        ("Asian", "Asian"),
+        ("Pacific Islander", "Pacific Islander"),
+        ("White, non-Hispanic", "White"),
+        ("Two or more", "Two or more"),
+        ("Black", "Black"),
+        ("Black, non-Hispanic", "Black"),
+        ("Hispanic", "Hispanic"),
+        ("American Indian or Alaska Native", "Native American"),
+        ("Native Hawaiian or Other Pacific Islander", "Pacific Islander"),
+        ("two or more races", "Two or more")
+    ]
 
-    disparity_columns = []
-    grad_rate_columns = []
-
-    # Handle alternative naming of graduation rate columns
     grad_rate_column_options = {
         "Asian": [
             "Graduation rate, Asian",
@@ -454,34 +452,33 @@ with tabs[4]:
         ]
     }
 
-    for grad_label, disparity_key in race_order:
-        grad_col = None
-        for col_option in grad_rate_column_options.get(disparity_key, []):
-            if col_option in cluster_df_encoded.columns:
-                grad_col = col_option
-                break
+    disparity_columns = []
+    grad_rate_columns = []
 
+    for grad_label, disparity_key in race_order:
+        grad_col = next((col for col in grad_rate_column_options.get(disparity_key, []) if col in corr_df_encoded.columns), None)
         disparity_col = f"{disparity_key}_disparity"
 
         if grad_col:
             grad_rate_columns.append(grad_col)
         else:
-            print(f"⚠️ Missing graduation column: {grad_label}")
+            st.warning(f"Graduation rate data is missing for the {grad_label} group.")
 
-        if disparity_col in cluster_df_encoded.columns:
+        if disparity_col in corr_df_encoded.columns:
             disparity_columns.append(disparity_col)
         else:
-            print(f"⚠️ Missing disparity column: {disparity_col}")
+            st.warning(f"Disparity data is missing for the {disparity_col} column.")
 
+    if len(grad_rate_columns) == 0 or len(disparity_columns) == 0:
+        st.error("❌ Missing graduation or disparity columns needed for correlation matrix.")
+        st.stop()
 
     st.write("✅ Found disparity columns:", disparity_columns)
     st.write("✅ Found graduation columns:", grad_rate_columns)
 
-    # ✅ Select relevant numeric data
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
     numeric_cols = corr_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
 
-    # ✅ Correlation matrix
     corr_matrix = numeric_cols.corr()
     corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
     rounded_values = np.round(corr_matrix_selected.values, 2)
@@ -489,29 +486,23 @@ with tabs[4]:
     x_labels = list(corr_matrix_selected.columns)
     y_labels = list(corr_matrix_selected.index)
 
-    # ✅ Plot with dynamic text contrast
     try:
         fig_corr = ff.create_annotated_heatmap(
-        z=rounded_values,
-        x=x_labels,
-        y=y_labels,
-        colorscale='YlGnBu',
-        showscale=True,
-        colorbar_title="Correlation Coefficient",
-        annotation_text=[[f"{val:.2f}" for val in row] for row in rounded_values]
+            z=rounded_values,
+            x=x_labels,
+            y=y_labels,
+            colorscale='YlGnBu',
+            showscale=True,
+            colorbar_title="Correlation Coefficient",
+            annotation_text=[[f"{val:.2f}" for val in row] for row in rounded_values]
         )
 
-        # 🔁 Dynamically adjust font color for contrast based on value
         for i, ann in enumerate(fig_corr.layout.annotations):
-            # Convert flat index to 2D indices
             row = i // len(x_labels)
             col = i % len(x_labels)
             val = rounded_values[row][col]
-
-            # Adjust contrast: light background → dark text, and vice versa
             ann.font.color = 'black' if abs(val) < 0.25 else 'white'
 
-        # Layout settings
         fig_corr.update_layout(
             title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
             xaxis_title="Faculty-Student Disparity",
@@ -525,6 +516,7 @@ with tabs[4]:
 
     except Exception as e:
         st.error(f"❌ Error rendering correlation heatmap: {e}")
+
 
 
     st.text("The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.")
@@ -545,10 +537,16 @@ with tabs[4]:
                     cramers_v_matrix.loc[col1, col2] = 1.0
         return cramers_v_matrix
 
+    existing_categoricals = [col for col in categorical_features if col in corr_df.columns]
+    st.write("🕵️‍♂️ Categorical columns present for Cramér's V:", existing_categoricals)
+
+    cramers_v_corr_matrix = cramers_v_matrix(corr_df, existing_categoricals)
+    st.write("📀 Cramér's V matrix shape:", cramers_v_corr_matrix.shape)
+    st.write("🧪 Cramér's V matrix preview:")
+    st.dataframe(cramers_v_corr_matrix)
+
     numeric_df = corr_df_encoded[[col for col in numerical_features if col in corr_df_encoded.columns]].copy()
     pearson_corr_matrix = numeric_df.corr()
-
-    cramers_v_corr_matrix = cramers_v_matrix(corr_df_encoded, [col for col in categorical_features if col in corr_df_encoded.columns])
 
     st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
     st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
@@ -581,28 +579,25 @@ with tabs[4]:
     st.plotly_chart(fig_pearson, use_container_width=True, key="fig_corr_pearson")
 
     st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
-    st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
+    if not cramers_v_corr_matrix.empty:
+        st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
 
-    fig_cramers_v = ff.create_annotated_heatmap(
-        z=cramers_v_corr_matrix.values.astype(float).round(2),
-        x=list(cramers_v_corr_matrix.columns),
-        y=list(cramers_v_corr_matrix.index),
-        colorscale='YlGnBu',
-        showscale=True,
-        colorbar_title="Cramér's V"
-    )
-    fig_cramers_v.update_layout(
-        title="Cramér's V Correlation Matrix (Categorical Features)",
-        xaxis_title="Categorical Features",
-        yaxis_title="Categorical Features",
-        width=800,
-        height=600,
-        template="plotly_dark"
-    )
-    st.plotly_chart(fig_cramers_v, use_container_width=True)
-
-    st.text("""
-    The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
-    The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
-    You can hover over the cells to see the exact values for each correlation.
-    """)
+        fig_cramers_v = ff.create_annotated_heatmap(
+            z=cramers_v_corr_matrix.values.astype(float).round(2),
+            x=list(cramers_v_corr_matrix.columns),
+            y=list(cramers_v_corr_matrix.index),
+            colorscale='YlGnBu',
+            showscale=True,
+            colorbar_title="Cramér's V"
+        )
+        fig_cramers_v.update_layout(
+            title="Cramér's V Correlation Matrix (Categorical Features)",
+            xaxis_title="Categorical Features",
+            yaxis_title="Categorical Features",
+            width=800,
+            height=600,
+            template="plotly_dark"
+        )
+        st.plotly_chart(fig_cramers_v, use_container_width=True, key="fig_corr_cramers")
+    else:
+        st.warning("⚠️ Not enough categorical data available to compute Cramér's V correlation matrix.")
