@@ -364,84 +364,81 @@ with tabs[3]:
     st.pyplot(plt)
 
 
-
 # --- 📊 Interactive Correlation Matrix ---
 with tabs[4]:
     st.subheader("📈 Interactive Correlation Matrix of Disparities vs. Graduation Rates")
 
-    # Define relevant numerical features (including all graduation rates and disparities)
+    categorical_features = [
+        "Public/Private",
+        "Degree of urbanization (Urban-centric locale)",
+        "Institutional category"
+    ]
+
     numerical_features = [
         "Total  enrollment",
         "Tuition and fees, 2023-24",
         "Percent admitted - total",
         "Graduation rate, total cohort"
     ]
-    # Add all graduation rate columns present (covering different naming conventions)
+
     numerical_features += [col for col in GRAD_RATE_COLS if col in merged.columns]
-    # Ensure Black and White graduation rate columns are included if present (alternate naming)
+
     if "Graduation rate, Black" in merged.columns and "Graduation rate, Black, non-Hispanic" not in merged.columns:
         numerical_features.append("Graduation rate, Black")
     if "Graduation rate, White" in merged.columns and "Graduation rate, White, non-Hispanic" not in merged.columns:
         numerical_features.append("Graduation rate, White")
-    # Add all disparity columns present
+
     numerical_features += [f"{r}_disparity" for r in FACULTY_RACE_COLS if f"{r}_disparity" in merged.columns]
 
-    # Include categorical features (for completeness in dataset, will be encoded later)
     all_features = numerical_features + categorical_features
     available_features = [col for col in all_features if col in merged.columns]
 
-    # Drop rows with more than 30% missing values in these relevant columns
     row_thresh = int(0.7 * len(available_features))
     corr_df = merged[available_features].dropna(thresh=row_thresh)
 
-    # Encode categorical features and prepare data for correlation
+    if corr_df.empty:
+        st.error("⚠️ Not enough data after threshold filtering. Please adjust missing data settings.")
+        st.stop()
+
     corr_df_encoded = pd.get_dummies(
         corr_df,
         columns=[col for col in categorical_features if col in corr_df.columns],
         drop_first=True
     )
     corr_df_encoded = corr_df_encoded.replace([np.inf, -np.inf], np.nan)
-    # **Do not drop rows here**: allow pairwise correlation with remaining NaNs
 
-    # Determine available disparity and graduation rate columns dynamically
     disparity_columns = []
     grad_rate_columns = []
     for race, options in grad_rate_column_options.items():
-        # Find the first matching graduation rate column for this race
-        grad_col = next((col for col in options if col in corr_df.columns), None)
+        grad_col = next((col for col in options if col in corr_df_encoded.columns), None)
         disparity_col = f"{race}_disparity"
         if grad_col:
             if grad_col not in grad_rate_columns:
                 grad_rate_columns.append(grad_col)
         else:
             st.warning(f"Graduation rate data is missing for the {race} group.")
-        if disparity_col in corr_df.columns:
+        if disparity_col in corr_df_encoded.columns:
             if disparity_col not in disparity_columns:
                 disparity_columns.append(disparity_col)
         else:
             st.warning(f"Disparity data is missing for the {race} group.")
 
-    # Proceed only if we have data for correlations
-    if corr_df.shape[0] < 2 or not grad_rate_columns or not disparity_columns:
+    if corr_df_encoded.shape[0] < 2 or not grad_rate_columns or not disparity_columns:
         st.warning("Not enough data available to compute the correlation matrix.")
     else:
-        # Compute correlation matrix on the selected numeric columns
-        numeric_cols = corr_df_encoded[grad_rate_columns + disparity_columns].select_dtypes(include=[np.number])
+        grad_rate_disparity_columns = grad_rate_columns + disparity_columns
+        numeric_cols = corr_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
         corr_matrix = numeric_cols.corr()
-
-        # Extract the sub-matrix of interest: graduation rates vs disparities
         try:
             corr_matrix_selected = corr_matrix.loc[grad_rate_columns, disparity_columns]
         except KeyError as e:
             st.error(f"❌ Error selecting correlation sub-matrix: {e}")
             st.stop()
 
-        # Round values for display
         rounded_values = np.round(corr_matrix_selected.values, 2)
         x_labels = list(corr_matrix_selected.columns)
         y_labels = list(corr_matrix_selected.index)
 
-        # Create annotated heatmap
         try:
             fig_corr = ff.create_annotated_heatmap(
                 z=rounded_values,
@@ -452,13 +449,12 @@ with tabs[4]:
                 colorbar_title="Correlation Coefficient",
                 annotation_text=[[f"{val:.2f}" for val in row] for row in rounded_values]
             )
-            # Adjust text color for better contrast
             for i, ann in enumerate(fig_corr.layout.annotations):
                 row = i // len(x_labels)
                 col = i % len(x_labels)
                 val = rounded_values[row][col]
                 ann.font.color = "black" if abs(val) < 0.25 else "white"
-            # Update layout and display chart
+
             fig_corr.update_layout(
                 title="Interactive Correlation Matrix of Disparities vs. Graduation Rates",
                 xaxis_title="Faculty-Student Disparity",
@@ -467,16 +463,18 @@ with tabs[4]:
                 height=600,
                 template="plotly_dark"
             )
-            st.plotly_chart(fig_corr, use_container_width=True)
+            st.plotly_chart(fig_corr, use_container_width=True, key="heatmap_disparity_grad_1")
         except Exception as e:
             st.error(f"❌ Error rendering correlation heatmap: {e}")
 
-    # (Optional) Add explanatory text or additional correlation analyses below if needed.
+    st.markdown("""
+    The interactive correlation matrix above shows the relationships between racial disparities in faculty-student composition and graduation rates for each racial group. You can hover over each cell to see the correlation coefficient. Positive correlations indicate that greater disparities in faculty diversity are associated with higher graduation rates, while negative correlations suggest the opposite. This matrix helps understand how faculty-student diversity disparities may influence academic success rates across different racial and ethnic groups.
+    """)
 
 
     # ✅ Select relevant numeric data
     grad_rate_disparity_columns = disparity_columns + grad_rate_columns
-    numeric_cols = cluster_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
+    numeric_cols = corr_df_encoded[grad_rate_disparity_columns].select_dtypes(include=[np.number])
 
     # ✅ Correlation matrix
     corr_matrix = numeric_cols.corr()
@@ -518,7 +516,7 @@ with tabs[4]:
             template="plotly_dark"
         )
 
-        st.plotly_chart(fig_corr, use_container_width=True)
+        st.plotly_chart(fig_corr, use_container_width=True, key="heatmap_disparity_grad_2")
 
     except Exception as e:
         st.error(f"❌ Error rendering correlation heatmap: {e}")
@@ -542,10 +540,10 @@ with tabs[4]:
                     cramers_v_matrix.loc[col1, col2] = 1.0
         return cramers_v_matrix
 
-    numeric_df = cluster_df_encoded[[col for col in numerical_features if col in cluster_df_encoded.columns]].copy()
+    numeric_df = corr_df_encoded[[col for col in numerical_features if col in corr_df_encoded.columns]].copy()
     pearson_corr_matrix = numeric_df.corr()
 
-    cramers_v_corr_matrix = cramers_v_matrix(cluster_df, [col for col in categorical_features if col in cluster_df.columns])
+    cramers_v_corr_matrix = cramers_v_matrix(corr_df_encoded, [col for col in categorical_features if col in corr_df_encoded.columns])
 
     st.write("### 📊 Pearson Correlation Matrix (Numeric Features)")
     st.dataframe(pearson_corr_matrix.style.format("{:.2f}"))
@@ -575,9 +573,11 @@ with tabs[4]:
         height=900,
         template="plotly_dark"
     )
-    st.plotly_chart(fig_pearson, use_container_width=True)
+    st.plotly_chart(fig_pearson, use_container_width=True, key="fig_corr_pearson")
 
-    st.write("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
+ite("### 📊 Cramér's V Correlation Matrix (Categorical Features)")
+
+if not cramers_v_corr_matrix.empty:
     st.dataframe(cramers_v_corr_matrix.style.format("{:.2f}"))
 
     fig_cramers_v = ff.create_annotated_heatmap(
@@ -596,10 +596,13 @@ with tabs[4]:
         height=600,
         template="plotly_dark"
     )
-    st.plotly_chart(fig_cramers_v, use_container_width=True)
+    st.plotly_chart(fig_cramers_v, use_container_width=True, key="fig_corr_cramers")
+else:
+    st.warning("⚠️ Not enough categorical data available to compute Cramér's V correlation matrix.")
 
-    st.text("""
-    The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
-    The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
-    You can hover over the cells to see the exact values for each correlation.
-    """)
+st.text("""
+The Pearson correlation matrix shows the relationships between numeric variables (e.g., faculty-student disparity, graduation rate, etc.).
+The Cramér's V matrix shows the strength of association between categorical features (e.g., institution type, urbanization degree).
+You can hover over the cells to see the exact values for each correlation.
+""")
+    st.wr       
