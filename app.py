@@ -81,6 +81,72 @@ tabs = st.tabs(["📋 Overview", "🧠 PCA & UMAP", "🎯 Disparity Clusters", "
 st.text("© 2025, CHOE FAN MARQUESES NGO ")
 # === 📋 Overview ===
 with tabs[0]:
+    st.subheader("Introduction")
+    st.markdown("""While racial topics are always at the heart of American society’s public discourses, racial equality has proved itself even more significant and prominent on college campuses as it redefines not only college demographic dynamics but also opportunities for many students from less fortunate socio-economic backgrounds.
+    From 1961 to 2023, affirmative action has greatly influenced the racial proportions of students in higher education institutions. In 2025, in this post-affirmative-action era, diversity and representation in higher education remain—if not become more—central topics many pay attention to.
+    While much focus has been paid to the racial composition of the student body, less scrutiny has been applied to the racial makeup of college faculty. Meanwhile, the diversity of the faculty can, to an extent, dictate the voices in class and in the community.""")
+
+    st.subheader("Research Question")
+
+    st.markdown("> To what extent do racial disparities exist between faculty and students across U.S. colleges, and what patterns can be observed across different institution types?")
+
+    st.subheader("Project Objectives")
+
+    st.markdown("The project aims to analyze this disparity using **dimensionality reduction** and **regression methods**. By looking into the data, the team wishes to uncover systemic trends and highlight areas for more comprehensive **policy intervention** beneficial to all groups of racial minorities.")
+
+    st.subheader("Review of Related Literature")
+
+    st.markdown("""Many previous studies dig into the racial composition of student bodies. However, there is still limited research that focuses on the faculty. Specifically, these studies have found **persistent underrepresentation of racial minorities among college faculty**, even as student representation grows more diverse.For students, racial diversity in U.S. colleges has significantly increased. According to the **National Center for Education Statistics (2020)**:""")
+    st.markdown("- The proportion of White students dropped from **77% in 1976** to **55% in 2020**.")
+    st.markdown("- **Hispanic students** rose from **6% to 19%**.")
+    st.markdown("- **Black students** rose from **10% to 14%** over the same period.")
+    st.markdown("Despite this growing diversity, **significant achievement gaps remain**.  The **Education Trust (2018)** highlights that **Black and Latinx students face lower graduation rates**.")
+
+    st.subheader("The Importance of Faculty Diversity")
+    st.markdown("""
+    Antonio (2001) noted that:
+    > While racial diversity improves critical thinking and fosters diverse class spaces, students of color often experience marginalization due to faculty homogeneity.
+
+    Faculty diversity has **not kept pace** with student diversity. According to **NCES (2020)**:
+    - Only **6.2%** of full-time faculty were **Black**.
+    - **5.5%** were **Latinx**.
+    - **2.4%** were **Native American**.
+    - **78%** of faculty were **White**.
+
+    This underrepresentation, particularly in **leadership and STEM fields**, affects the academic environment. Researchers argue that **faculty diversity improves student outcomes** by fostering inclusive learning environments (**Freeman et al., 2016**).
+
+    Hurtado’s team (2010) found that:
+    > Students perform better in diverse classrooms, suggesting that faculty diversity plays a key role in enhancing the student experience.
+
+    Diverse faculty influence the campus both **academically and socially**.  
+    Milem, Chang, and Antonio (2005) noted:
+    > When faculty reflect student diversity, students of color are more likely to succeed and feel a sense of belonging.
+
+    In contrast, **Denson and Chang (2009)** pointed out that:
+    > A lack of faculty diversity contributes to a negative racial climate.
+
+    **García (2019)** confirms:
+    > Especially in elite institutions, students of color report a greater sense of isolation when faculty diversity is lacking.
+
+    ---
+
+    ### Variation Across Institution Types
+
+    Faculty diversity **varies across institutional types**. The **National Academy of Sciences (2018)** reports that:
+    - **Public and urban colleges** have more diverse student populations but **lag in faculty diversity**.
+    - Elite institutions often lack significant representation of minority faculty in **STEM**, contributing to a **“leaky pipeline”** for underrepresented students (**National Science Foundation, 2018**).
+
+    ---
+
+    ### Conclusion
+
+    Faculty diversity is **crucial** for creating inclusive environments that improve student outcomes, but **significant barriers remain**. Addressing these disparities is essential to fostering a more **equitable and inclusive higher education system**.
+
+    To seek solutions, **our project builds on these studies** by:
+    - **Visualizing** disparities across institutions.
+    - **Quantitatively examining** how demographic and institutional characteristics relate to the disparity.
+    """)
+
     st.subheader("📋 Filtered Institutions with Racial Disparities")
 
     overview_columns = ["institution name_x"] + [f"{race}_disparity" for race in FACULTY_RACE_COLS] + [
